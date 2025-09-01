@@ -418,13 +418,28 @@ const powerUpMaterial = new THREE.MeshBasicMaterial({
   opacity: 0.9
 });
 
-function createPowerUp() {
-  // Create main power-up sphere with brighter colors
+function createPowerUp(type = 'blue') {
+  // Define colors based on type
+  let mainColor, emissiveColor, ringColor, ringEmissive;
+  
+  if (type === 'red') {
+    mainColor = 0xff4444;
+    emissiveColor = 0xaa2222;
+    ringColor = 0xff6666;
+    ringEmissive = 0xff3333;
+  } else { // blue (default)
+    mainColor = 0x00ddff;
+    emissiveColor = 0x0066aa;
+    ringColor = 0x00ffff;
+    ringEmissive = 0x0088ff;
+  }
+  
+  // Create main power-up sphere with type-specific colors
   const mainMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x00ddff,
+    color: mainColor,
     transparent: true,
     opacity: 1.0,
-    emissive: 0x0066aa,
+    emissive: emissiveColor,
     emissiveIntensity: 0.5
   });
   
@@ -433,10 +448,10 @@ function createPowerUp() {
   // Create energy ring around the main sphere
   const ringGeometry = new THREE.RingGeometry(0.2, 0.3, 16);
   const ringMaterial = new THREE.MeshStandardMaterial({
-    color: 0x00ffff,
+    color: ringColor,
     transparent: true,
     opacity: 0.7,
-    emissive: 0x0088ff,
+    emissive: ringEmissive,
     emissiveIntensity: 0.4,
     side: THREE.DoubleSide
   });
@@ -458,10 +473,11 @@ function createPowerUp() {
     pulseTime: Math.random() * Math.PI * 2,
     pulseSpeed: 0.1,
     fallSpeed: 0.05,
-    energyRing: energyRing // Store reference to ring for animation
+    energyRing: energyRing, // Store reference to ring for animation
+    type: type // Store power-up type
   };
   
-  console.log('Power-up created at position:', powerUp.position);
+  console.log(`${type} power-up created at position:`, powerUp.position);
   scene.add(powerUp);
   powerUps.push(powerUp);
   console.log('Total power-ups:', powerUps.length);
@@ -565,10 +581,136 @@ function checkCollision(obj1, obj2, threshold = 0.5) {
   return obj1.position.distanceTo(obj2.position) < threshold;
 }
 
+// --- Advanced Swoop Behaviors ---
+function findFormationGroups(enemies) {
+  const groups = [];
+  const processed = new Set();
+  
+  enemies.forEach(enemy => {
+    if (processed.has(enemy)) return;
+    
+    const group = [enemy];
+    processed.add(enemy);
+    
+    // Find nearby enemies
+    enemies.forEach(other => {
+      if (processed.has(other)) return;
+      
+      const distance = enemy.position.distanceTo(other.position);
+      if (distance < 2.0) { // Close enough to be in formation
+        group.push(other);
+        processed.add(other);
+      }
+    });
+    
+    if (group.length >= 2) {
+      groups.push(group);
+    }
+  });
+  
+  return groups;
+}
+
+function initiateSwoop(enemy, swoopType) {
+  enemy.userData.state = 'diving';
+  enemy.userData.diveTime = 0;
+  enemy.userData.diveDuration = 90 + Math.random() * 60;
+  
+  const start = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
+  let end, mid;
+  
+  if (swoopType < 0.3) {
+    // Direct attack - aim at player's current position
+    end = new THREE.Vector3(player.position.x, player.position.y, 0);
+    mid = start.clone().lerp(end, 0.5);
+    mid.x += (Math.random() - 0.5) * 2;
+  } else if (swoopType < 0.6) {
+    // Predictive attack - aim where player will be
+    const playerVelocity = new THREE.Vector3(0, 0, 0); // Could track player movement
+    const predictionTime = 30; // frames ahead
+    end = new THREE.Vector3(
+      player.position.x + playerVelocity.x * predictionTime,
+      player.position.y + playerVelocity.y * predictionTime,
+      0
+    );
+    mid = start.clone().lerp(end, 0.4);
+    mid.x += (Math.random() - 0.5) * 3;
+  } else if (swoopType < 0.8) {
+    // Side attack - swoop from the side
+    const sideOffset = (Math.random() - 0.5) * 8; // -4 to 4
+    end = new THREE.Vector3(player.position.x + sideOffset, player.position.y - 2, 0);
+    mid = new THREE.Vector3(
+      start.x + (end.x - start.x) * 0.3,
+      start.y - 1,
+      0
+    );
+  } else {
+    // Circular attack - swoop in an arc
+    end = new THREE.Vector3(player.position.x, player.position.y, 0);
+    mid = new THREE.Vector3(
+      start.x + (Math.random() - 0.5) * 6,
+      start.y - 2,
+      0
+    );
+  }
+  
+  enemy.userData.diveCurve = [start, mid, end];
+  audioManager.playDive();
+}
+
+function initiateFormationSwoop(group) {
+  const leader = group[0];
+  
+  // Calculate formation center and target
+  const formationCenter = new THREE.Vector3();
+  group.forEach(enemy => {
+    formationCenter.add(new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0));
+  });
+  formationCenter.divideScalar(group.length);
+  
+  // Target is player position
+  const target = new THREE.Vector3(player.position.x, player.position.y, 0);
+  
+  // Calculate formation movement vector
+  const formationMovement = target.clone().sub(formationCenter);
+  
+  // Set up each enemy in the formation
+  group.forEach((enemy, index) => {
+    enemy.userData.state = 'diving';
+    enemy.userData.diveTime = 0;
+    enemy.userData.diveDuration = 90 + Math.random() * 60;
+    
+    // Calculate relative position within formation
+    const relativePos = new THREE.Vector3(
+      enemy.userData.formationX - formationCenter.x,
+      enemy.userData.formationY - formationCenter.y,
+      0
+    );
+    
+    // Start position (current formation position)
+    const start = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
+    
+    // End position (maintains relative position in formation)
+    const end = target.clone().add(relativePos);
+    
+    // Mid point for curve (formation moves together)
+    const mid = start.clone().lerp(end, 0.5);
+    mid.x += (Math.random() - 0.5) * 1; // Small random variation
+    
+    enemy.userData.diveCurve = [start, mid, end];
+    enemy.userData.formationLeader = leader; // Reference to leader for coordination
+  });
+  
+  // Play dive sound for formation
+  audioManager.playDive();
+}
+
 // --- Galaga-style Enemy Movement ---
 let diveCooldown = 0;
 let powerUpSpawnTimer = 0;
+let gameStartTimer = 0;
 const POWERUP_SPAWN_INTERVAL = 180; // frames between power-up spawns (3 seconds at 60fps)
+const GAME_START_DELAY = 180; // 3 seconds at 60fps before enemies start swooping
 
 function animate() {
   requestAnimationFrame(animate);
@@ -607,7 +749,9 @@ function animate() {
     powerUpSpawnTimer++;
     if (powerUpSpawnTimer >= POWERUP_SPAWN_INTERVAL) {
       console.log('Spawning power-up!');
-      createPowerUp();
+      // 10% chance for red power-up, 90% for blue
+      const powerUpType = Math.random() < 0.1 ? 'red' : 'blue';
+      createPowerUp(powerUpType);
       powerUpSpawnTimer = 0;
     }
   }
@@ -660,28 +804,31 @@ function animate() {
     }
   }
 
+  // Game start timer
+  if (gameState.isPlaying && !gameState.playerDestroyed) {
+    gameStartTimer++;
+  }
+
   // Enemy movement
   // 1. Formation enemies stay in place (with a little wiggle)
-  // 2. Occasionally, one enemy dives toward the player in a curve
+  // 2. Occasionally, one enemy dives toward the player in a curve (after 3 second delay)
   // 3. If it misses, it returns to formation
   if (diveCooldown > 0) diveCooldown--;
-  else if (enemies.length > 0 && Math.random() < 0.02) {
-    // Pick a random enemy in formation to dive
+  else if (enemies.length > 0 && gameStartTimer >= GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed && Math.random() < 0.02) {
     const formationEnemies = enemies.filter(e => e.userData.state === 'formation');
     if (formationEnemies.length > 0) {
-      const diver = formationEnemies[Math.floor(Math.random() * formationEnemies.length)];
-      diver.userData.state = 'diving';
-      diver.userData.diveTime = 0;
-      diver.userData.diveDuration = 90 + Math.random() * 60;
-      // Set up a curved path: center is between formation and player
-      const start = new THREE.Vector3(diver.userData.formationX, diver.userData.formationY, 0);
-      const end = new THREE.Vector3(player.position.x, player.position.y, 0);
-      const mid = start.clone().lerp(end, 0.5);
-      mid.x += (Math.random() - 0.5) * 3; // curve
-      diver.userData.diveCurve = [start, mid, end];
+      // Check for formation swooping (enemies close to each other)
+      const formationGroups = findFormationGroups(formationEnemies);
       
-      // Play dive sound
-      audioManager.playDive();
+      if (formationGroups.length > 0 && Math.random() < 0.3) {
+        // Formation swoop - multiple enemies together
+        const group = formationGroups[Math.floor(Math.random() * formationGroups.length)];
+        initiateFormationSwoop(group);
+      } else {
+        // Single enemy swoop with variety
+        const diver = formationEnemies[Math.floor(Math.random() * formationEnemies.length)];
+        initiateSwoop(diver, Math.random());
+      }
     }
     diveCooldown = 60 + Math.random() * 60;
   }
@@ -752,8 +899,15 @@ function animate() {
         // Play power-up collection sound
         audioManager.playPowerUp();
         
-        // TODO: Add power-up effects here
-        console.log('Power-up collected!');
+        // Handle different power-up types
+        const powerUpType = powerUp.userData.type;
+        if (powerUpType === 'red') {
+          console.log('Red power-up collected! (Special effect)');
+          // TODO: Add red power-up effects here
+        } else {
+          console.log('Blue power-up collected! (Standard effect)');
+          // TODO: Add blue power-up effects here
+        }
       }
     }
   }
