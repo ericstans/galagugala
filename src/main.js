@@ -419,14 +419,31 @@ const powerUpMaterial = new THREE.MeshBasicMaterial({
 });
 
 function createPowerUp() {
-  // Create a simple material without cloning
-  const material = new THREE.MeshBasicMaterial({ 
-    color: 0x00aaff,
+  // Create main power-up sphere with brighter colors
+  const mainMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0x00ddff,
     transparent: true,
-    opacity: 0.9
+    opacity: 1.0,
+    emissive: 0x0066aa,
+    emissiveIntensity: 0.5
   });
   
-  const powerUp = new THREE.Mesh(powerUpGeometry, material);
+  const powerUp = new THREE.Mesh(powerUpGeometry, mainMaterial);
+  
+  // Create energy ring around the main sphere
+  const ringGeometry = new THREE.RingGeometry(0.2, 0.3, 16);
+  const ringMaterial = new THREE.MeshStandardMaterial({
+    color: 0x00ffff,
+    transparent: true,
+    opacity: 0.7,
+    emissive: 0x0088ff,
+    emissiveIntensity: 0.4,
+    side: THREE.DoubleSide
+  });
+  
+  const energyRing = new THREE.Mesh(ringGeometry, ringMaterial);
+  energyRing.rotation.x = Math.PI / 2; // Make it horizontal
+  powerUp.add(energyRing); // Add ring as child of main sphere
   
   // Random X position at top of screen
   powerUp.position.x = (Math.random() - 0.5) * 10; // -5 to 5
@@ -440,7 +457,8 @@ function createPowerUp() {
   powerUp.userData = {
     pulseTime: Math.random() * Math.PI * 2,
     pulseSpeed: 0.1,
-    fallSpeed: 0.05
+    fallSpeed: 0.05,
+    energyRing: energyRing // Store reference to ring for animation
   };
   
   console.log('Power-up created at position:', powerUp.position);
@@ -605,6 +623,29 @@ function animate() {
     powerUp.userData.pulseTime += powerUp.userData.pulseSpeed;
     const pulseScale = 1.5 + Math.sin(powerUp.userData.pulseTime) * 0.3; // Adjusted for new base scale
     powerUp.scale.setScalar(pulseScale);
+    
+    // Dynamic glow effect for main sphere
+    const glowIntensity = 0.5 + Math.sin(powerUp.userData.pulseTime * 1.5) * 0.3;
+    powerUp.material.emissiveIntensity = glowIntensity;
+    
+    // Energy ring animation
+    const ring = powerUp.userData.energyRing;
+    if (ring) {
+      // Ring pulsing scale
+      const ringScale = 1.0 + Math.sin(powerUp.userData.pulseTime * 2) * 0.4;
+      ring.scale.setScalar(ringScale);
+      
+      // Ring rotation
+      ring.rotation.z += 0.05;
+      
+      // Ring glow pulsing
+      const ringGlow = 0.4 + Math.sin(powerUp.userData.pulseTime * 2.5) * 0.3;
+      ring.material.emissiveIntensity = ringGlow;
+      
+      // Ring opacity pulsing
+      const ringOpacity = 0.7 + Math.sin(powerUp.userData.pulseTime * 1.8) * 0.3;
+      ring.material.opacity = Math.max(0.3, ringOpacity);
+    }
     
     // Debug: log position occasionally
     if (Math.floor(powerUp.userData.pulseTime * 10) % 60 === 0) {
