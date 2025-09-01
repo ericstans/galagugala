@@ -1,10 +1,10 @@
 // Game configuration constants
 export const GAME_CONFIG = {
   // Player settings
-  PLAYER_SPEED: 0.2,
+  PLAYER_SPEED: 0.08,
   
   // Bullet settings
-  BULLET_SPEED: 0.4,
+  BULLET_SPEED: 0.2,
   
   // Enemy settings
   ENEMY_SPEED: 0.02,
@@ -14,7 +14,7 @@ export const GAME_CONFIG = {
   ENEMY_Y_SPACING: 1.0,
   
   // Power-up settings
-  POWERUP_SPAWN_INTERVAL: 180, // frames between power-up spawns (3 seconds at 60fps)
+  POWERUP_SPAWN_INTERVAL: 900, // frames between power-up spawns (15 seconds at 60fps)
   POWERUP_RED_CHANCE: 0.1, // 10% chance for red power-up
   
   // Game timing
