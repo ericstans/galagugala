@@ -9,6 +9,9 @@ export class EnemyManager {
     this.gameStartTimer = 0;
     this.enemyGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.3);
     this.enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+    this.initialColumnStructure = {}; // Track initial column structure
+    this.processedColumns = new Set(); // Track which columns have already spawned power-ups
+    this.lastEnemyInColumn = {}; // Track the last enemy destroyed in each column
     this.createEnemies(level);
   }
 
@@ -54,6 +57,11 @@ export class EnemyManager {
     
     console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}, Y spacing ${clampedYSpacing.toFixed(2)}`);
     
+    // Reset initial column structure and processed columns
+    this.initialColumnStructure = {};
+    this.processedColumns.clear();
+    this.lastEnemyInColumn = {};
+    
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
         const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
@@ -72,6 +80,12 @@ export class EnemyManager {
         };
         this.scene.add(enemy);
         this.enemies.push(enemy);
+        
+        // Track initial column structure
+        if (!this.initialColumnStructure[formationX]) {
+          this.initialColumnStructure[formationX] = 0;
+        }
+        this.initialColumnStructure[formationX]++;
       }
     }
   }
@@ -265,12 +279,66 @@ export class EnemyManager {
     audioManager.playDive();
   }
 
-  removeEnemy(enemy) {
+  removeEnemy(enemy, powerUpCallback = null) {
     const index = this.enemies.indexOf(enemy);
     if (index > -1) {
+      const formationX = enemy.userData.formationX;
+      
+      // Check if this is the last enemy in this column BEFORE removing it
+      const columnCounts = this.getColumnCounts();
+      const isLastInColumn = columnCounts[formationX] === 1;
+      
+      if (isLastInColumn && powerUpCallback) {
+        // Spawn power-up immediately at this enemy's position
+        powerUpCallback({
+          x: enemy.position.x,
+          y: enemy.position.y,
+          z: enemy.position.z
+        });
+      }
+      
       this.scene.remove(enemy);
       this.enemies.splice(index, 1);
     }
+  }
+
+  // Check if any columns have been completely destroyed (and not yet processed)
+  checkForDestroyedColumns() {
+    if (this.enemies.length === 0) return [];
+    
+    // Get current column counts
+    const currentColumnCounts = this.getColumnCounts();
+    
+    // Find columns that are completely destroyed (had enemies initially but none now)
+    const newlyDestroyedColumns = [];
+    Object.keys(this.initialColumnStructure).forEach(x => {
+      const initialCount = this.initialColumnStructure[x];
+      const currentCount = currentColumnCounts[x] || 0;
+      
+      // Column is destroyed and hasn't been processed yet
+      if (initialCount > 0 && currentCount === 0 && !this.processedColumns.has(x)) {
+        newlyDestroyedColumns.push({
+          x: parseFloat(x),
+          lastEnemyPosition: this.lastEnemyInColumn[x]
+        });
+        this.processedColumns.add(x); // Mark as processed
+      }
+    });
+    
+    return newlyDestroyedColumns;
+  }
+
+  // Get the number of enemies remaining in each column
+  getColumnCounts() {
+    if (this.enemies.length === 0) return {};
+    
+    const columnCounts = {};
+    this.enemies.forEach(enemy => {
+      const x = enemy.userData.formationX;
+      columnCounts[x] = (columnCounts[x] || 0) + 1;
+    });
+    
+    return columnCounts;
   }
 
   clearAll() {
@@ -278,5 +346,7 @@ export class EnemyManager {
       this.scene.remove(enemy);
     });
     this.enemies = [];
+    this.processedColumns.clear();
+    this.lastEnemyInColumn = {};
   }
 }

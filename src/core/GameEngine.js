@@ -19,6 +19,11 @@ export class GameEngine {
     
     // Renderer setup
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Make canvas focusable for keyboard input
+    this.renderer.domElement.setAttribute('tabindex', '0');
+    this.renderer.domElement.style.outline = 'none';
+    
     document.body.appendChild(this.renderer.domElement);
     
     // Handle window resize

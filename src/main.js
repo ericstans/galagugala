@@ -28,6 +28,7 @@ class Game {
     this.effects = new EffectsManager(this.engine.scene);
     
     this.audioStarted = false;
+    this.gameStarted = false;
   }
 
   getLevelFromURL() {
@@ -55,10 +56,10 @@ class Game {
   init() {
     this.engine.init();
     this.setupAudioStart();
-    this.engine.animate(() => this.update());
+    this.setupGameStart();
     
-    // Start soundtrack for current level
-    this.audio.updateSoundtrack(this.currentLevel);
+    // Show start overlay
+    this.overlay.showStartOverlay();
   }
   
   setupAudioStart() {
@@ -67,6 +68,7 @@ class Game {
       if (!this.audioStarted && this.audio.audioContext) {
         this.audio.audioContext.resume();
         this.audio.startBackgroundSound();
+        this.audio.startSoundtrackForCurrentLevel();
         this.audioStarted = true;
       }
     };
@@ -75,8 +77,50 @@ class Game {
     document.addEventListener('click', startAudio, { once: true });
     document.addEventListener('keydown', startAudio, { once: true });
   }
+
+  setupGameStart() {
+    const startGame = () => {
+      if (!this.gameStarted) {
+        // Hide start overlay
+        this.overlay.hideStartOverlay();
+        
+        // Start audio
+        if (!this.audioStarted && this.audio.audioContext) {
+          this.audio.audioContext.resume();
+          this.audio.startBackgroundSound();
+          this.audio.startSoundtrackForCurrentLevel();
+          this.audioStarted = true;
+        }
+        
+        // Start game loop
+        this.engine.animate(() => this.update());
+        
+        // Start soundtrack for current level
+        this.audio.updateSoundtrack(this.currentLevel);
+        
+        // Set keyboard focus to the game canvas
+        this.engine.renderer.domElement.focus();
+        
+        this.gameStarted = true;
+        console.log('Game started!');
+      }
+    };
+
+    // Add click listener to start game
+    this.overlay.startOverlay.addEventListener('click', startGame, { once: true });
+    
+    // Also start on any key press
+    const startOnKey = (e) => {
+      startGame();
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', startOnKey, { once: true });
+  }
   
   update() {
+    // Only update if game has started
+    if (!this.gameStarted) return;
+    
     const gameState = this.engine.getGameState();
     
     // Update player
@@ -92,7 +136,7 @@ class Game {
     this.enemies.update(this.player, gameState, this.audio);
     
     // Update power-ups
-    this.powerUps.update(gameState, this.player, this.enemies);
+    this.powerUps.update(gameState, this.player, this.enemies, this.audio);
     
     // Update effects
     const effectsResult = this.effects.update();
@@ -129,11 +173,14 @@ class Game {
     if (bulletCollision) {
       const { bulletIndex, enemyIndex, bullet, enemy } = bulletCollision;
       
-      // Remove bullet and enemy
+      // Remove bullet
       this.engine.scene.remove(bullet);
-      this.engine.scene.remove(enemy);
       this.player.bullets.splice(bulletIndex, 1);
-      this.enemies.enemies.splice(enemyIndex, 1);
+      
+      // Remove enemy with power-up callback
+      this.enemies.removeEnemy(enemy, (position) => {
+        this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+      });
       
       // Play hit sound
       this.audio.playHit();
@@ -149,11 +196,14 @@ class Game {
     if (wingBulletCollision) {
       const { bulletIndex, enemyIndex, bullet, enemy } = wingBulletCollision;
       
-      // Remove bullet and enemy
+      // Remove bullet
       this.engine.scene.remove(bullet);
-      this.engine.scene.remove(enemy);
       this.player.wingBullets.splice(bulletIndex, 1);
-      this.enemies.enemies.splice(enemyIndex, 1);
+      
+      // Remove enemy with power-up callback
+      this.enemies.removeEnemy(enemy, (position) => {
+        this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+      });
       
       // Play hit sound
       this.audio.playHit();
@@ -198,8 +248,10 @@ class Game {
         wing.getWorldPosition(wingWorldPos);
         this.effects.createExplosion(wingWorldPos);
         
-        // Remove enemy
-        this.enemies.removeEnemy(enemy);
+        // Remove enemy with power-up callback
+        this.enemies.removeEnemy(enemy, (position) => {
+          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+        });
         
         // Destroy wing
         this.player.destroyWing(wing);
@@ -293,10 +345,11 @@ class Game {
     
     // Clear all enemies and power-ups
     this.enemies.clearAll();
-    this.powerUps.clearAll();
+    this.powerUps.clearPowerUpsOnly(); // Don't reset chain on level progression
     
-    // Hide chain display for new level
-    this.overlay.hideChain();
+    // Update chain display for new level (chain persists)
+    const currentChainCount = this.powerUps.getChainCount();
+    this.overlay.updateChain(currentChainCount);
     
     // Spawn new enemies for the next level with level-based scaling
     console.log(`Creating enemies for level ${this.currentLevel}...`);

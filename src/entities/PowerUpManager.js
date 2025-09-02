@@ -14,7 +14,7 @@ export class PowerUpManager {
     this.chainCount = 0;
   }
 
-  createPowerUp(type = 'blue') {
+  createPowerUp(type = 'blue', position = null) {
     // Define colors based on type
     let mainColor, emissiveColor, ringColor, ringEmissive;
     
@@ -56,10 +56,17 @@ export class PowerUpManager {
     energyRing.rotation.x = Math.PI / 2; // Make it horizontal
     powerUp.add(energyRing); // Add ring as child of main sphere
     
-    // Random X position at top of screen
-    powerUp.position.x = (Math.random() - 0.5) * 10; // -5 to 5
-    powerUp.position.y = 8; // Start at top
-    powerUp.position.z = 0;
+    // Set position - use provided position or random at top of screen
+    if (position) {
+      powerUp.position.x = position.x;
+      powerUp.position.y = position.y;
+      powerUp.position.z = position.z;
+    } else {
+      // Random X position at top of screen (fallback)
+      powerUp.position.x = (Math.random() - 0.5) * 10; // -5 to 5
+      powerUp.position.y = 8; // Start at top
+      powerUp.position.z = 0;
+    }
     
     // Make it bigger
     powerUp.scale.setScalar(1.5);
@@ -80,36 +87,9 @@ export class PowerUpManager {
     return powerUp;
   }
 
-  update(gameState, player, enemyManager) {
-    // Power-up spawning
-    if (gameState.isPlaying && enemyManager && enemyManager.enemies.length > 0) {
-      this.spawnTimer++;
-      if (this.spawnTimer >= GAME_CONFIG.POWERUP_SPAWN_INTERVAL) {
-        if (debug) console.log('Spawning power-up!');
-        
-        // Determine power-up type based on player's wing status
-        let powerUpType;
-        const hasBoth = player.hasBothWings();
-        const hasAny = player.hasAnyWing();
-        const missingWing = player.getMissingWing();
-        
-        if (debug) console.log('Wing status:', { hasBoth, hasAny, missingWing, leftWing: !!player.leftWing, rightWing: !!player.rightWing });
-        
-        if (hasBoth) {
-          // Player has both wings, only spawn blue power-ups
-          powerUpType = 'blue';
-          if (debug) console.log('Player has both wings, spawning blue power-up');
-        } else {
-          // Player missing wings, can spawn red power-ups
-          const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
-          powerUpType = shouldSpawnRed ? 'red' : 'blue';
-          if (debug) console.log(`Player missing wings, spawning ${powerUpType} power-up (red chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
-        }
-        
-        this.createPowerUp(powerUpType);
-        this.spawnTimer = 0;
-      }
-    }
+  update(gameState, player, enemyManager, audioManager = null) {
+    // Power-up spawning is now handled by row destruction events
+    // Timer-based spawning has been removed
 
     // Power-up movement and animation
     for (let i = this.powerUps.length - 1; i >= 0; i--) {
@@ -157,7 +137,7 @@ export class PowerUpManager {
         
         // Reset chain if blue power-up falls off screen
         if (powerUp.userData.type === 'blue') {
-          this.resetChain();
+          this.resetChain(audioManager);
         }
         
         this.scene.remove(powerUp);
@@ -175,13 +155,13 @@ export class PowerUpManager {
       this.scene.remove(powerUp);
       this.powerUps.splice(powerUpIndex, 1);
       
-      // Play power-up collection sound
-      audioManager.playPowerUp();
-      
       // Handle different power-up types
       const powerUpType = powerUp.userData.type;
       if (powerUpType === 'red') {
         if (debug) console.log('Red power-up collected! (Both wings upgrade)');
+        
+        // Play power-up collection sound (red power-ups use base pitch)
+        audioManager.playPowerUp(1);
         
         // Add both wings if missing
         let wingsAdded = [];
@@ -204,6 +184,10 @@ export class PowerUpManager {
       } else {
         if (debug) console.log('Blue power-up collected! (Standard effect)');
         this.incrementChain();
+        
+        // Play power-up collection sound with current chain count (higher pitch for longer chains)
+        audioManager.playPowerUp(this.chainCount);
+        
         return { type: 'blue', chainCount: this.chainCount };
       }
     }
@@ -225,7 +209,15 @@ export class PowerUpManager {
       this.scene.remove(powerUp);
     });
     this.powerUps = [];
-    this.resetChain();
+    this.resetChain(); // Don't play sound on game restart
+  }
+
+  clearPowerUpsOnly() {
+    this.powerUps.forEach(powerUp => {
+      this.scene.remove(powerUp);
+    });
+    this.powerUps = [];
+    // Don't reset chain - let it persist across levels
   }
 
   // Chain mechanic methods
@@ -234,14 +226,41 @@ export class PowerUpManager {
     console.log(`Chain incremented to ${this.chainCount}`);
   }
 
-  resetChain() {
+  resetChain(audioManager = null) {
     if (this.chainCount > 0) {
       console.log(`Chain broken! Was at ${this.chainCount}`);
       this.chainCount = 0;
+      
+      // Play chain break sound effect
+      if (audioManager) {
+        audioManager.playChainBreak();
+      }
     }
   }
 
   getChainCount() {
     return this.chainCount;
+  }
+
+  // Spawn power-up when a column is destroyed
+  spawnPowerUpOnColumnDestroyed(player, position = null) {
+    if (debug) console.log('Column destroyed! Spawning power-up...');
+    
+    // Determine power-up type based on player's wing status
+    let powerUpType;
+    const hasBoth = player.hasBothWings();
+    
+    if (hasBoth) {
+      // Player has both wings, only spawn blue power-ups
+      powerUpType = 'blue';
+      if (debug) console.log('Player has both wings, spawning blue power-up');
+    } else {
+      // Player missing wings, can spawn red power-ups
+      const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
+      powerUpType = shouldSpawnRed ? 'red' : 'blue';
+      if (debug) console.log(`Player missing wings, spawning ${powerUpType} power-up (red chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
+    }
+    
+    this.createPowerUp(powerUpType, position);
   }
 }

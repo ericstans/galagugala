@@ -2,6 +2,9 @@ export class OverlayManager {
   constructor() {
     this.overlay = this.createOverlay();
     this.chainDisplay = this.createChainDisplay();
+    this.startOverlay = this.createStartOverlay();
+    this.chainFadeTimeout = null; // Track fade-out timeout
+    this.lastChainCount = 0; // Track previous chain count to detect breaks
     this.setupEventListeners();
   }
 
@@ -51,13 +54,49 @@ export class OverlayManager {
       chainDisplay.style.fontFamily = 'Arial, sans-serif';
       chainDisplay.style.textAlign = 'center';
       chainDisplay.style.textShadow = '0 0 20px #00fffc, 0 0 40px #00fffc';
+      chainDisplay.style.whiteSpace = 'pre-line'; // Support line breaks
+      chainDisplay.style.lineHeight = '0.8'; // Tighter line spacing for multi-line text
       chainDisplay.style.zIndex = '500'; // Behind other elements but above game
       chainDisplay.style.display = 'none';
       chainDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
       chainDisplay.style.userSelect = 'none';
+      chainDisplay.style.transition = 'opacity 0.5s ease-out'; // Fade-out animation
+      chainDisplay.style.opacity = '1'; // Start fully visible
       document.body.appendChild(chainDisplay);
     }
     return chainDisplay;
+  }
+
+  createStartOverlay() {
+    let startOverlay = document.getElementById('start-overlay');
+    if (!startOverlay) {
+      startOverlay = document.createElement('div');
+      startOverlay.id = 'start-overlay';
+      startOverlay.style.position = 'fixed';
+      startOverlay.style.top = '0';
+      startOverlay.style.left = '0';
+      startOverlay.style.width = '100vw';
+      startOverlay.style.height = '100vh';
+      startOverlay.style.display = 'flex';
+      startOverlay.style.justifyContent = 'center';
+      startOverlay.style.alignItems = 'center';
+      startOverlay.style.background = 'rgba(0,0,0,0.9)';
+      startOverlay.style.zIndex = '2000';
+      startOverlay.style.flexDirection = 'column';
+      startOverlay.style.color = '#00fffc';
+      startOverlay.style.fontSize = '3rem';
+      startOverlay.style.fontFamily = 'Arial, sans-serif';
+      startOverlay.style.textAlign = 'center';
+      startOverlay.style.cursor = 'pointer';
+      startOverlay.style.userSelect = 'none';
+      startOverlay.innerHTML = `
+        <div style="font-size:4rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 0 20px #00fffc;">GALAGUGALA</div>
+        <div style="font-size:2rem;margin-bottom:1rem;">Click to Start</div>
+        <div style="font-size:1rem;opacity:0.8;">Use WASD to move, SPACE to shoot</div>
+      `;
+      document.body.appendChild(startOverlay);
+    }
+    return startOverlay;
   }
 
   setupEventListeners() {
@@ -156,20 +195,69 @@ export class OverlayManager {
   // Chain display methods
   showChain(chainCount) {
     if (chainCount > 2) {
+      // Cancel any ongoing fade-out
+      if (this.chainFadeTimeout) {
+        clearTimeout(this.chainFadeTimeout);
+        this.chainFadeTimeout = null;
+      }
+      
       this.chainDisplay.textContent = chainCount;
       this.chainDisplay.style.display = 'block';
+      this.chainDisplay.style.opacity = '1'; // Ensure it's fully visible
     }
   }
 
   hideChain() {
-    this.chainDisplay.style.display = 'none';
+    // Cancel any existing fade-out timeout
+    if (this.chainFadeTimeout) {
+      clearTimeout(this.chainFadeTimeout);
+    }
+    
+    // Show "CHAIN BROKEN" text instead of fading out the number
+    this.chainDisplay.textContent = 'CHAIN\nBROKEN';
+    this.chainDisplay.style.display = 'block';
+    this.chainDisplay.style.opacity = '1'; // Start fully visible
+    
+    // Start fade-out animation after a brief moment, then hide completely
+    this.chainFadeTimeout = setTimeout(() => {
+      this.chainDisplay.style.opacity = '0';
+      
+      // Hide the element after the fade animation completes
+      this.chainFadeTimeout = setTimeout(() => {
+        this.chainDisplay.style.display = 'none';
+        this.chainFadeTimeout = null;
+      }, 500); // Match the transition duration
+    }, 200); // Brief pause to show the text
   }
 
   updateChain(chainCount) {
     if (chainCount > 2) {
       this.showChain(chainCount);
     } else {
-      this.hideChain();
+      // Only show "CHAIN BROKEN" if we had a chain before (not at game start)
+      if (this.lastChainCount > 2) {
+        this.hideChain();
+      } else {
+        // Just hide the display without showing "CHAIN BROKEN" text
+        this.chainDisplay.style.display = 'none';
+        // Cancel any pending fade-out timeouts
+        if (this.chainFadeTimeout) {
+          clearTimeout(this.chainFadeTimeout);
+          this.chainFadeTimeout = null;
+        }
+      }
     }
+    
+    // Update the last chain count for next comparison
+    this.lastChainCount = chainCount;
+  }
+
+  // Start overlay methods
+  showStartOverlay() {
+    this.startOverlay.style.display = 'flex';
+  }
+
+  hideStartOverlay() {
+    this.startOverlay.style.display = 'none';
   }
 }

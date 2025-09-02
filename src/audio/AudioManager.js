@@ -15,7 +15,7 @@ export class AudioManager {
       chords: null   // Layer 4: Chords
     };
     
-    this.currentLevel = 1;
+    this.currentLevel = 0; // Start at 0 so first updateSoundtrack call always starts layers
     this.isPlaying = false;
     this.bpm = 128;
     this.beatInterval = null;
@@ -133,7 +133,7 @@ export class AudioManager {
     return oscillator;
   }
 
-  createPowerUpSound() {
+  createPowerUpSound(chainCount = 1) {
     if (!this.audioContext) return null;
     
     const oscillator = this.audioContext.createOscillator();
@@ -142,9 +142,20 @@ export class AudioManager {
     oscillator.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
     
-    oscillator.frequency.setValueAtTime(600, this.audioContext.currentTime);
-    oscillator.frequency.linearRampToValueAtTime(800, this.audioContext.currentTime + 0.1);
-    oscillator.frequency.linearRampToValueAtTime(1000, this.audioContext.currentTime + 0.2);
+    // Base frequencies for the ascending sound
+    const baseFreq1 = 600;
+    const baseFreq2 = 800;
+    const baseFreq3 = 1000;
+    
+    // Increase pitch based on chain count (each chain adds ~50Hz)
+    const pitchBoost = (chainCount - 1) * 50;
+    const freq1 = baseFreq1 + pitchBoost;
+    const freq2 = baseFreq2 + pitchBoost;
+    const freq3 = baseFreq3 + pitchBoost;
+    
+    oscillator.frequency.setValueAtTime(freq1, this.audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(freq2, this.audioContext.currentTime + 0.1);
+    oscillator.frequency.linearRampToValueAtTime(freq3, this.audioContext.currentTime + 0.2);
     
     gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
     gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.3, this.audioContext.currentTime + 0.01);
@@ -203,6 +214,49 @@ export class AudioManager {
     return oscillator;
   }
 
+  createChainBreakSound() {
+    if (!this.audioContext) return null;
+    
+    // Create a descending "failure" tone with some dissonance
+    const oscillator1 = this.audioContext.createOscillator();
+    const oscillator2 = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    
+    // Connect oscillators to filter, then to gain
+    oscillator1.connect(filter);
+    oscillator2.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // First oscillator: descending tone
+    oscillator1.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    oscillator1.frequency.exponentialRampToValueAtTime(200, this.audioContext.currentTime + 0.3);
+    oscillator1.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.6);
+    
+    // Second oscillator: slightly dissonant for tension
+    oscillator2.frequency.setValueAtTime(450, this.audioContext.currentTime);
+    oscillator2.frequency.exponentialRampToValueAtTime(225, this.audioContext.currentTime + 0.3);
+    oscillator2.frequency.exponentialRampToValueAtTime(112, this.audioContext.currentTime + 0.6);
+    
+    // Low-pass filter for a more muted, disappointing sound
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, this.audioContext.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(200, this.audioContext.currentTime + 0.6);
+    
+    // Volume envelope: quick attack, slow decay
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.25, this.audioContext.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.8);
+    
+    oscillator1.start(this.audioContext.currentTime);
+    oscillator2.start(this.audioContext.currentTime);
+    oscillator1.stop(this.audioContext.currentTime + 0.8);
+    oscillator2.stop(this.audioContext.currentTime + 0.8);
+    
+    return [oscillator1, oscillator2];
+  }
+
   // Background ambient sound
   createBackgroundSound() {
     if (!this.audioContext) return null;
@@ -231,40 +285,54 @@ export class AudioManager {
 
   // Public methods to trigger sounds
   playShoot() {
+    if (!this.audioContext) return;
     this.createShootSound();
   }
 
   playHit() {
+    if (!this.audioContext) return;
     this.createHitSound();
   }
 
   playDive() {
+    if (!this.audioContext) return;
     this.createDiveSound();
   }
 
   playExplosion() {
+    if (!this.audioContext) return;
     this.createExplosionSound();
   }
 
-  playPowerUp() {
-    this.createPowerUpSound();
+  playPowerUp(chainCount = 1) {
+    if (!this.audioContext) return;
+    this.createPowerUpSound(chainCount);
   }
 
   playGameOver() {
+    if (!this.audioContext) return;
     this.createGameOverSound();
   }
 
   playWin() {
+    if (!this.audioContext) return;
     this.createWinSound();
   }
 
+  playChainBreak() {
+    if (!this.audioContext) return;
+    this.createChainBreakSound();
+  }
+
   startBackgroundSound() {
+    if (!this.audioContext) return;
     if (!this.backgroundSound) {
       this.backgroundSound = this.createBackgroundSound();
     }
   }
 
   stopBackgroundSound() {
+    if (!this.audioContext) return;
     if (this.backgroundSound) {
       this.backgroundSound.oscillator.stop();
       this.backgroundSound = null;
@@ -299,7 +367,7 @@ export class AudioManager {
     
     // Longer 808-style decay
     gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.4, this.audioContext.currentTime + 0.005);
+    gainNode.gain.linearRampToValueAtTime(0.7, this.audioContext.currentTime + 0.005);
     gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.8);
     
     oscillator.start(this.audioContext.currentTime);
@@ -524,18 +592,28 @@ export class AudioManager {
   }
 
   updateSoundtrack(level) {
-    // Calculate soundtrack phase for current and new level
-    const currentPhase = Math.floor((this.currentLevel - 1) / 2) + 1;
-    const newPhase = Math.floor((level - 1) / 2) + 1;
-    
-    // Only update if soundtrack phase changes
-    if (currentPhase === newPhase) return;
-    
+    // Always update the current level, even if AudioContext isn't available yet
     this.currentLevel = level;
     this.bassBeatCounter = 0; // Reset bass beat counter for new level
-    const activeLayers = this.getLayersForLevel(level);
     
-    console.log(`Level ${level} (Phase ${newPhase}): Playing layers:`, activeLayers);
+    // Only start layers if AudioContext is available
+    if (!this.audioContext) {
+      console.log(`Level ${level}: AudioContext not available, soundtrack will start when user interacts`);
+      return;
+    }
+    
+    this.startSoundtrackForCurrentLevel();
+  }
+
+  startSoundtrackForCurrentLevel() {
+    if (!this.audioContext) return;
+    
+    // Calculate soundtrack phase for current level
+    const soundtrackPhase = Math.floor((this.currentLevel - 1) / 2) + 1;
+    const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
+    const activeLayers = this.getLayersForLevel(this.currentLevel);
+    
+    console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Starting layers:`, activeLayers);
     
     // Stop all layers
     Object.keys(this.soundtrackLayers).forEach(layer => {
