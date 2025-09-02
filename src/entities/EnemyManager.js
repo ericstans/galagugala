@@ -69,7 +69,6 @@ export class EnemyManager {
           diveAngle: 0,
           diveRadius: 0,
           diveCenter: new THREE.Vector3(),
-          isDestroyed: false, // Flag to prevent collisions after destruction
         };
         this.scene.add(enemy);
         this.enemies.push(enemy);

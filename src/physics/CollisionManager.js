@@ -11,10 +11,6 @@ export class CollisionManager {
       const bullet = bullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
-        // Skip destroyed enemies
-        if (enemy.userData && enemy.userData.isDestroyed) {
-          continue;
-        }
         if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
@@ -28,10 +24,6 @@ export class CollisionManager {
       const bullet = wingBullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
-        // Skip destroyed enemies
-        if (enemy.userData && enemy.userData.isDestroyed) {
-          continue;
-        }
         if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
@@ -42,10 +34,6 @@ export class CollisionManager {
 
   static checkPlayerEnemyCollision(player, enemies, threshold = GAME_CONFIG.PLAYER_COLLISION_THRESHOLD) {
     for (let enemy of enemies) {
-      // Skip destroyed enemies
-      if (enemy.userData && enemy.userData.isDestroyed) {
-        continue;
-      }
       if (enemy.position.distanceTo(player.position) < threshold) {
         return enemy;
       }
@@ -55,11 +43,6 @@ export class CollisionManager {
 
   static checkWingEnemyCollision(player, enemies, threshold = GAME_CONFIG.COLLISION_THRESHOLD) {
     for (let enemy of enemies) {
-      // Skip destroyed enemies
-      if (enemy.userData && enemy.userData.isDestroyed) {
-        continue;
-      }
-      
       // Check left wing collision
       if (player.leftWing && !player.leftWing.userData.isDestroyed) {
         const leftWingWorldPos = new THREE.Vector3();
@@ -89,64 +72,5 @@ export class CollisionManager {
       }
     }
     return null;
-  }
-
-  // Process all collisions and return results
-  static processAllCollisions(player, enemies, powerUps, audioManager, gameState) {
-    const results = {
-      bulletCollisions: [],
-      wingBulletCollisions: [],
-      powerUpCollisions: [],
-      wingCollisions: [],
-      playerCollisions: []
-    };
-
-    // Main bullet-enemy collision
-    const bulletCollision = this.checkBulletEnemyCollision(
-      player.bullets, 
-      enemies, 
-      audioManager
-    );
-    
-    if (bulletCollision) {
-      results.bulletCollisions.push(bulletCollision);
-    }
-    
-    // Wing bullet-enemy collision
-    const wingBulletCollision = this.checkWingBulletEnemyCollision(
-      player.wingBullets,
-      enemies,
-      audioManager
-    );
-    
-    if (wingBulletCollision) {
-      results.wingBulletCollisions.push(wingBulletCollision);
-    }
-    
-    // Player-power-up collision
-    if (gameState.isPlaying && !gameState.playerDestroyed) {
-      const powerUpResult = powerUps.checkCollisions(player, audioManager);
-      if (powerUpResult) {
-        results.powerUpCollisions.push(powerUpResult);
-      }
-    }
-    
-    // Check wing-enemy collisions first (only if not invulnerable)
-    if (!player.isInvulnerable) {
-      const wingCollision = this.checkWingEnemyCollision(player, enemies);
-      if (wingCollision && !gameState.playerDestroyed) {
-        results.wingCollisions.push(wingCollision);
-      }
-    }
-    
-    // Game over (enemy reaches player) - only if not invulnerable
-    if (!player.isInvulnerable) {
-      const enemyCollision = this.checkPlayerEnemyCollision(player, enemies);
-      if (enemyCollision && !gameState.playerDestroyed) {
-        results.playerCollisions.push(enemyCollision);
-      }
-    }
-
-    return results;
   }
 }

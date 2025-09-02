@@ -1,8 +1,5 @@
 import * as THREE from 'three';
 import { GameEngine } from './core/GameEngine.js';
-import { LevelManager } from './core/LevelManager.js';
-import { GameStateManager } from './core/GameStateManager.js';
-import { CollisionHandler } from './core/CollisionHandler.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { Player } from './entities/Player.js';
 import { EnemyManager } from './entities/EnemyManager.js';
@@ -19,15 +16,10 @@ class Game {
     this.input = new InputManager();
     this.overlay = new OverlayManager();
     
-    // Core managers
-    this.levelManager = new LevelManager();
-    this.gameStateManager = new GameStateManager(this.engine, this.effects, this.overlay, this.audio);
-    this.collisionHandler = new CollisionHandler(this.engine.scene, this.audio, this.effects, this.overlay);
-    
     this.player = new Player(this.engine.scene);
     
-    // Initialize entities with current level
-    this.currentLevel = this.levelManager.getCurrentLevel();
+    // Level progression - check URL parameter
+    this.currentLevel = this.getLevelFromURL();
     console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
     
     this.enemies = new EnemyManager(this.engine.scene, this.currentLevel);
@@ -35,13 +27,30 @@ class Game {
     this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
     
-    // Update gameStateManager with effects reference
-    this.gameStateManager.effects = this.effects;
-    
     this.audioStarted = false;
   }
 
-
+  getLevelFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const levelParam = urlParams.get('level');
+    
+    console.log(`URL search params: ${window.location.search}`);
+    console.log(`Level parameter from URL: ${levelParam}`);
+    
+    if (levelParam) {
+      const level = parseInt(levelParam, 10);
+      console.log(`Parsed level: ${level}`);
+      if (level >= 1 && level <= 100) { // Reasonable level range
+        console.log(`Starting game at level ${level} (from URL parameter)`);
+        return level;
+      } else {
+        console.warn(`Invalid level parameter: ${levelParam}. Must be between 1-100. Starting at level 1.`);
+      }
+    }
+    
+    console.log(`No valid level parameter found, defaulting to level 1`);
+    return 1; // Default to level 1
+  }
   
   init() {
     this.engine.init();
@@ -93,42 +102,7 @@ class Game {
     const gameOverFinished = effectsResult && effectsResult.gameOverFinished;
     
     // Check collisions
-    const collisionResults = CollisionManager.processAllCollisions(
-      this.player, 
-      this.enemies.enemies, 
-      this.powerUps, 
-      this.audio, 
-      gameState
-    );
-    
-    // Handle collision results
-    const collisionAction = this.collisionHandler.handleCollisionResults(
-      collisionResults, 
-      this.player, 
-      this.enemies, 
-      this.powerUps
-    );
-    
-    // Handle game over from collision
-    if (collisionAction && collisionAction.action === 'gameOver') {
-      this.engine.setGameState({
-        playerDestroyed: true,
-        isPlaying: false
-      });
-      
-      // Create explosion at player position
-      this.effects.createExplosion(this.player.position);
-      
-      // Remove player ship
-      this.player.destroy();
-      
-      // Play explosion sound
-      this.audio.playExplosion();
-    }
-    
-    // Update chain display based on current chain count
-    const currentChainCount = this.powerUps.getChainCount();
-    this.overlay.updateChain(currentChainCount);
+    this.checkCollisions();
     
     // Update UI status
     this.overlay.updateInvulnerabilityStatus(this.player.isInvulnerable);
@@ -139,29 +113,173 @@ class Game {
     }
     
     // Check game state
-    const gameStateAction = this.gameStateManager.checkGameState(
-      completedExplosion, 
-      levelCompleteFinished, 
-      gameOverFinished, 
-      this.player, 
-      this.enemies, 
-      this.input
-    );
-    
-    // Handle game state actions
-    if (gameStateAction && gameStateAction.action === 'restart') {
-      this.restartGame();
-    } else if (gameStateAction && gameStateAction.action === 'nextLevel') {
-      this.startNextLevel();
-    }
+    this.checkGameState(completedExplosion, levelCompleteFinished, gameOverFinished);
   }
   
-
+  checkCollisions() {
+    const gameState = this.engine.getGameState();
+    
+    // Main bullet-enemy collision
+    const bulletCollision = CollisionManager.checkBulletEnemyCollision(
+      this.player.bullets, 
+      this.enemies.enemies, 
+      this.audio
+    );
+    
+    if (bulletCollision) {
+      const { bulletIndex, enemyIndex, bullet, enemy } = bulletCollision;
+      
+      // Remove bullet and enemy
+      this.engine.scene.remove(bullet);
+      this.engine.scene.remove(enemy);
+      this.player.bullets.splice(bulletIndex, 1);
+      this.enemies.enemies.splice(enemyIndex, 1);
+      
+      // Play hit sound
+      this.audio.playHit();
+    }
+    
+    // Wing bullet-enemy collision
+    const wingBulletCollision = CollisionManager.checkWingBulletEnemyCollision(
+      this.player.wingBullets,
+      this.enemies.enemies,
+      this.audio
+    );
+    
+    if (wingBulletCollision) {
+      const { bulletIndex, enemyIndex, bullet, enemy } = wingBulletCollision;
+      
+      // Remove bullet and enemy
+      this.engine.scene.remove(bullet);
+      this.engine.scene.remove(enemy);
+      this.player.wingBullets.splice(bulletIndex, 1);
+      this.enemies.enemies.splice(enemyIndex, 1);
+      
+      // Play hit sound
+      this.audio.playHit();
+    }
+    
+    // Player-power-up collision
+    if (gameState.isPlaying && !gameState.playerDestroyed) {
+      const powerUpResult = this.powerUps.checkCollisions(this.player, this.audio);
+      if (powerUpResult) {
+        // Handle wing upgrades
+        if (powerUpResult.type === 'red' && powerUpResult.wingsAdded && powerUpResult.wingsAdded.length > 0) {
+          console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
+        }
+        
+        // Handle chain updates for blue power-ups
+        if (powerUpResult.type === 'blue' && powerUpResult.chainCount !== undefined) {
+          this.overlay.updateChain(powerUpResult.chainCount);
+        }
+      }
+    }
+    
+    // Update chain display based on current chain count
+    const currentChainCount = this.powerUps.getChainCount();
+    this.overlay.updateChain(currentChainCount);
+  }
   
+  checkGameState(completedExplosion, levelCompleteFinished, gameOverFinished) {
+    const gameState = this.engine.getGameState();
+    
+    // Check wing-enemy collisions first (only if not invulnerable)
+    if (!this.player.isInvulnerable) {
+      const wingCollision = CollisionManager.checkWingEnemyCollision(
+        this.player,
+        this.enemies.enemies
+      );
+      
+      if (wingCollision && !gameState.playerDestroyed) {
+        const { wing, enemy, side } = wingCollision;
+        
+        // Create explosion at wing position
+        const wingWorldPos = new THREE.Vector3();
+        wing.getWorldPosition(wingWorldPos);
+        this.effects.createExplosion(wingWorldPos);
+        
+        // Remove enemy
+        this.enemies.removeEnemy(enemy);
+        
+        // Destroy wing
+        this.player.destroyWing(wing);
+        
+        // Play explosion sound
+        this.audio.playExplosion();
+        
+        console.log(`${side} wing destroyed!`);
+      }
+    }
+    
+    // Game over (enemy reaches player) - only if not invulnerable
+    if (!this.player.isInvulnerable) {
+      const enemyCollision = CollisionManager.checkPlayerEnemyCollision(
+        this.player, 
+        this.enemies.enemies
+      );
+      
+      if (enemyCollision && !gameState.playerDestroyed) {
+        // Mark player as destroyed
+        this.engine.setGameState({
+          playerDestroyed: true,
+          isPlaying: false
+        });
+        
+        // Create explosion at player position
+        this.effects.createExplosion(this.player.position);
+        
+        // Remove player ship (cockpit and wings are automatically removed as they're children)
+        this.player.destroy();
+        
+        // Play explosion sound
+        this.audio.playExplosion();
+      }
+    }
+    
+    // Handle explosion completion
+    if (completedExplosion && gameState.playerDestroyed && !gameState.explosionComplete) {
+      this.engine.setGameState({ explosionComplete: true });
+      console.log('Player destroyed! Starting Game Over animation...');
+      this.audio.playGameOver();
+      this.effects.startGameOverAnimation();
+      return;
+    }
+    
+    // Fallback: Start Game Over animation immediately if player is destroyed
+    if (gameState.playerDestroyed && !this.effects.gameOverAnimation) {
+      console.log('Player destroyed! Starting Game Over animation immediately...');
+      this.audio.playGameOver();
+      this.effects.startGameOverAnimation();
+      this.engine.setGameState({ explosionComplete: true });
+      return;
+    }
+    
+    // Handle restart when game over and SPACE is pressed
+    if (this.effects.isWaitingForRestart() && this.input.isShootPressed()) {
+      console.log('Restarting game...');
+      this.restartGame();
+      return;
+    }
 
+    // Level complete condition (only if game is still playing)
+    if (this.enemies.enemies.length === 0 && gameState.isPlaying && !this.effects.levelCompleteAnimation) {
+      console.log('All enemies destroyed! Starting level complete animation...');
+      this.effects.startLevelCompleteAnimation();
+      this.overlay.showLevelComplete();
+    return;
+  }
+
+    // Handle level complete animation finished
+    if (levelCompleteFinished) {
+      console.log('Level complete animation finished! Starting next level...');
+      this.overlay.hideLevelComplete();
+      this.startNextLevel();
+      return;
+    }
+  }
 
   startNextLevel() {
-    this.currentLevel = this.levelManager.nextLevel();
+    this.currentLevel++;
     console.log(`Starting level ${this.currentLevel}...`);
     
     // Reset game state
@@ -194,7 +312,7 @@ class Game {
     console.log('Restarting game...');
     
     // Reset level to URL parameter level (or 1 if no parameter)
-    this.currentLevel = this.levelManager.resetToStartLevel();
+    this.currentLevel = this.getLevelFromURL();
     console.log(`Restarting at level ${this.currentLevel} (from URL parameter)`);
     
     // Reset game state
