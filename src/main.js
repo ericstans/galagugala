@@ -535,8 +535,8 @@ class Game {
       }
     }
     
-    // Enemy bullet-player collision (level 10+)
-    if (gameState.isPlaying && !gameState.playerDestroyed && this.enemies && this.currentLevel >= 10) {
+    // Enemy bullet-player collision (level 5+)
+    if (gameState.isPlaying && !gameState.playerDestroyed && this.enemies && this.currentLevel >= 5) {
       const enemyBulletCollision = CollisionManager.checkEnemyBulletPlayerCollision(
         this.enemies.enemyBullets,
         this.player

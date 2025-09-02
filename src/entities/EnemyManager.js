@@ -19,7 +19,7 @@ export class EnemyManager {
     this.processedColumns = new Set(); // Track which columns have already spawned power-ups
     this.lastEnemyInColumn = {}; // Track the last enemy destroyed in each column
     
-    // Enemy bullet system (level 10+)
+    // Enemy bullet system (level 5+)
     this.enemyBullets = [];
     this.bulletCooldown = 0;
     this.currentLevel = level;
@@ -213,8 +213,8 @@ export class EnemyManager {
       }
     }
 
-    // Enemy bullet system (level 10+)
-    if (this.currentLevel >= 10 && !divingDisabled) {
+    // Enemy bullet system (level 5+)
+    if (this.currentLevel >= 5 && !divingDisabled) {
       if (this.bulletCooldown > 0) this.bulletCooldown--;
       else if (this.enemies.length > 0 && gameState.isPlaying && !gameState.playerDestroyed) {
         // Different bullet types based on level
@@ -229,7 +229,7 @@ export class EnemyManager {
           // Level 15-19: Green and yellow bullets active
           shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE; // Base chance for green or yellow bullets
         } else {
-          // Level 10-14: Only green bullets
+          // Level 5-14: Only green bullets
           shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE;
         }
         
@@ -967,7 +967,7 @@ export class EnemyManager {
     enemy.userData.warningTime = 0;
     
     if (this.currentLevel < 15) {
-      // Green bullets (level 10-14) - solid green warning
+      // Green bullets (level 5-14) - solid green warning
       enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
       enemy.userData.warningType = 'green';
       // Change to green
