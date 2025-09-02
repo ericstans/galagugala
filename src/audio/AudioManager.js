@@ -825,13 +825,21 @@ export class AudioManager {
     
     if (DEBUG) console.log(`Lead synth playing ${this.currentChord} note at ${targetFrequency}Hz`);
     
-    // If no oscillator exists, create the initial one
-    if (!this.leadSynthOscillator) {
-      this.leadSynthOscillator = this.audioContext.createOscillator();
-      this.leadSynthGainNode = this.audioContext.createGain();
-      this.leadSynthFilter = this.audioContext.createBiquadFilter();
+    // If no oscillators exist, create the initial ones
+    if (!this.leadSynthOscillator1) {
+      // Create two detuned oscillators
+      this.leadSynthOscillator1 = this.audioContext.createOscillator();
+      this.leadSynthOscillator2 = this.audioContext.createOscillator();
+      this.leadSynthGainNode1 = this.audioContext.createGain();
+      this.leadSynthGainNode2 = this.audioContext.createGain();
+      this.leadSynthFilter1 = this.audioContext.createBiquadFilter();
+      this.leadSynthFilter2 = this.audioContext.createBiquadFilter();
       this.leadSynthLfo = this.audioContext.createOscillator();
       this.leadSynthLfoGain = this.audioContext.createGain();
+      
+      // Panning nodes
+      this.leadSynthPanner1 = this.audioContext.createStereoPanner();
+      this.leadSynthPanner2 = this.audioContext.createStereoPanner();
       
       // Phaser effect components
       this.leadSynthPhaserLfo = this.audioContext.createOscillator();
@@ -841,10 +849,12 @@ export class AudioManager {
       this.leadSynthPhaserFilter3 = this.audioContext.createBiquadFilter();
       this.leadSynthPhaserFilter4 = this.audioContext.createBiquadFilter();
       
-      // Set up the oscillator
-      this.leadSynthOscillator.type = 'sawtooth';
+      // Set up the two detuned oscillators
+      this.leadSynthOscillator1.type = 'sawtooth';
+      this.leadSynthOscillator2.type = 'sawtooth';
       this.leadSynthCurrentFreq = targetFrequency;
-      this.leadSynthOscillator.frequency.setValueAtTime(targetFrequency, this.audioContext.currentTime);
+      this.leadSynthOscillator1.frequency.setValueAtTime(targetFrequency, this.audioContext.currentTime);
+      this.leadSynthOscillator2.frequency.setValueAtTime(targetFrequency + 2, this.audioContext.currentTime); // 2Hz detune
       
       // LFO for subtle vibrato
       this.leadSynthLfo.type = 'sine';
@@ -870,18 +880,30 @@ export class AudioManager {
         filter.Q.setValueAtTime(1, this.audioContext.currentTime);
       });
       
-      // Main filter for warm analog sound with steep low-pass at 800Hz
-      this.leadSynthFilter.type = 'lowpass';
-      this.leadSynthFilter.frequency.setValueAtTime(800, this.audioContext.currentTime);
-      this.leadSynthFilter.Q.setValueAtTime(8, this.audioContext.currentTime);
+      // Main filters for warm analog sound with steep low-pass at 800Hz
+      this.leadSynthFilter1.type = 'lowpass';
+      this.leadSynthFilter1.frequency.setValueAtTime(800, this.audioContext.currentTime);
+      this.leadSynthFilter1.Q.setValueAtTime(8, this.audioContext.currentTime);
       
-      // Set up gain envelope (continuous sustain)
-      this.leadSynthGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-      this.leadSynthGainNode.gain.linearRampToValueAtTime(0.4, this.audioContext.currentTime + 0.5);
+      this.leadSynthFilter2.type = 'lowpass';
+      this.leadSynthFilter2.frequency.setValueAtTime(800, this.audioContext.currentTime);
+      this.leadSynthFilter2.Q.setValueAtTime(8, this.audioContext.currentTime);
+      
+      // Set up gain envelopes (continuous sustain)
+      this.leadSynthGainNode1.gain.setValueAtTime(0, this.audioContext.currentTime);
+      this.leadSynthGainNode1.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 0.5);
+      
+      this.leadSynthGainNode2.gain.setValueAtTime(0, this.audioContext.currentTime);
+      this.leadSynthGainNode2.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 0.5);
+      
+      // Set up panning (hard left and right)
+      this.leadSynthPanner1.pan.setValueAtTime(-1, this.audioContext.currentTime); // 100% left
+      this.leadSynthPanner2.pan.setValueAtTime(1, this.audioContext.currentTime);  // 100% right
       
       // Connect audio chain with phaser
       this.leadSynthLfo.connect(this.leadSynthLfoGain);
-      this.leadSynthLfoGain.connect(this.leadSynthOscillator.frequency);
+      this.leadSynthLfoGain.connect(this.leadSynthOscillator1.frequency);
+      this.leadSynthLfoGain.connect(this.leadSynthOscillator2.frequency);
       
       // Phaser modulation - connect LFO to all phaser filters
       this.leadSynthPhaserLfo.connect(this.leadSynthPhaserGain);
@@ -889,34 +911,50 @@ export class AudioManager {
         this.leadSynthPhaserGain.connect(filter.frequency);
       });
       
-      // Audio routing: oscillator -> phaser filters (in series) -> main filter -> gain -> output
-      this.leadSynthOscillator.connect(this.leadSynthPhaserFilter1);
+      // Audio routing for voice 1 (left): oscillator -> phaser filters -> main filter -> gain -> panner -> output
+      this.leadSynthOscillator1.connect(this.leadSynthPhaserFilter1);
       this.leadSynthPhaserFilter1.connect(this.leadSynthPhaserFilter2);
       this.leadSynthPhaserFilter2.connect(this.leadSynthPhaserFilter3);
       this.leadSynthPhaserFilter3.connect(this.leadSynthPhaserFilter4);
-      this.leadSynthPhaserFilter4.connect(this.leadSynthFilter);
-      this.leadSynthFilter.connect(this.leadSynthGainNode);
-      this.leadSynthGainNode.connect(this.soundtrackBus);
+      this.leadSynthPhaserFilter4.connect(this.leadSynthFilter1);
+      this.leadSynthFilter1.connect(this.leadSynthGainNode1);
+      this.leadSynthGainNode1.connect(this.leadSynthPanner1);
+      this.leadSynthPanner1.connect(this.soundtrackBus);
+      
+      // Audio routing for voice 2 (right): oscillator -> phaser filters -> main filter -> gain -> panner -> output
+      this.leadSynthOscillator2.connect(this.leadSynthPhaserFilter1);
+      this.leadSynthPhaserFilter1.connect(this.leadSynthPhaserFilter2);
+      this.leadSynthPhaserFilter2.connect(this.leadSynthPhaserFilter3);
+      this.leadSynthPhaserFilter3.connect(this.leadSynthPhaserFilter4);
+      this.leadSynthPhaserFilter4.connect(this.leadSynthFilter2);
+      this.leadSynthFilter2.connect(this.leadSynthGainNode2);
+      this.leadSynthGainNode2.connect(this.leadSynthPanner2);
+      this.leadSynthPanner2.connect(this.soundtrackBus);
       
       // Start oscillators
       this.leadSynthLfo.start(this.audioContext.currentTime);
       this.leadSynthPhaserLfo.start(this.audioContext.currentTime);
-      this.leadSynthOscillator.start(this.audioContext.currentTime);
+      this.leadSynthOscillator1.start(this.audioContext.currentTime);
+      this.leadSynthOscillator2.start(this.audioContext.currentTime);
       
       if (DEBUG) console.log('Lead synth oscillator with phaser created and started');
     } else {
-      // Monophonic: smoothly transition to new frequency with portamento
+      // Dual voice: smoothly transition to new frequency with portamento
       const portamentoTime = 0.3; // 300ms portamento
-      this.leadSynthOscillator.frequency.exponentialRampToValueAtTime(
+      this.leadSynthOscillator1.frequency.exponentialRampToValueAtTime(
         targetFrequency, 
+        this.audioContext.currentTime + portamentoTime
+      );
+      this.leadSynthOscillator2.frequency.exponentialRampToValueAtTime(
+        targetFrequency + 2, // Keep 2Hz detune
         this.audioContext.currentTime + portamentoTime
       );
       this.leadSynthCurrentFreq = targetFrequency;
       
-      if (DEBUG) console.log(`Lead synth portamento to ${targetFrequency}Hz`);
+      if (DEBUG) console.log(`Lead synth portamento to ${targetFrequency}Hz and ${targetFrequency + 2}Hz`);
     }
     
-    return this.leadSynthOscillator;
+    return this.leadSynthOscillator1;
   }
 
   createArp() {
@@ -1589,13 +1627,21 @@ export class AudioManager {
   }
 
   stopLeadSynth() {
-    if (this.leadSynthOscillator) {
+    if (this.leadSynthOscillator1) {
       try {
-        this.leadSynthOscillator.stop();
+        this.leadSynthOscillator1.stop();
       } catch (e) {
         // Oscillator might already be stopped
       }
-      this.leadSynthOscillator = null;
+      this.leadSynthOscillator1 = null;
+    }
+    if (this.leadSynthOscillator2) {
+      try {
+        this.leadSynthOscillator2.stop();
+      } catch (e) {
+        // Oscillator might already be stopped
+      }
+      this.leadSynthOscillator2 = null;
     }
     if (this.leadSynthLfo) {
       try {
