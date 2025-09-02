@@ -119,7 +119,7 @@ class Game {
       if (!this.audioStarted && this.audio.audioContext) {
         this.audio.audioContext.resume();
         this.audio.startBackgroundSound();
-        this.audio.startSoundtrackForCurrentLevel();
+        this.audio.updateSoundtrack(this.currentLevel);
         this.audioStarted = true;
       }
     };
@@ -148,7 +148,7 @@ class Game {
         if (!this.audioStarted && this.audio.audioContext) {
           this.audio.audioContext.resume();
           this.audio.startBackgroundSound();
-          this.audio.startSoundtrackForCurrentLevel();
+          this.audio.updateSoundtrack(this.currentLevel);
           this.audioStarted = true;
         }
         

@@ -24,6 +24,10 @@ export class AudioManager {
     this.reverb = null;
     this.currentChord = null;
     this.bassBeatCounter = 0; // Track beats for chord changes
+    this.globalBeatCounter = 0; // Global beat counter for synchronization
+    this.lastBeatTime = 0; // Track when the last beat occurred
+    this.centralBeatScheduler = null; // Central beat scheduler for all layers
+    this.activeLayers = new Set(); // Track which layers are currently active
     
     this.initAudio();
   }
@@ -630,15 +634,82 @@ export class AudioManager {
   updateSoundtrack(level) {
     // Always update the current level, even if AudioContext isn't available yet
     this.currentLevel = level;
-    this.bassBeatCounter = 0; // Reset bass beat counter for new level
     
-    // Only start layers if AudioContext is available
+    // Only update layers if AudioContext is available
     if (!this.audioContext) {
       console.log(`Level ${level}: AudioContext not available, soundtrack will start when user interacts`);
       return;
     }
     
-    this.startSoundtrackForCurrentLevel();
+    this.updateSoundtrackLayers();
+  }
+
+  updateSoundtrackLayers() {
+    if (!this.audioContext) return;
+    
+    // Calculate soundtrack phase for current level
+    const soundtrackPhase = Math.floor((this.currentLevel - 1) / 2) + 1;
+    const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
+    const activeLayers = this.getLayersForLevel(this.currentLevel);
+    
+    console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Updating layers:`, activeLayers);
+    
+    // Update the active layers set
+    this.activeLayers.clear();
+    activeLayers.forEach(layer => this.activeLayers.add(layer));
+    
+    // If no central beat scheduler exists, start it
+    if (!this.centralBeatScheduler) {
+      this.startCentralBeatScheduler();
+    }
+  }
+
+  startCentralBeatScheduler() {
+    if (!this.audioContext || this.centralBeatScheduler) return;
+    
+    const beatDuration = 60000 / this.bpm; // milliseconds per beat
+    const eighthNote = beatDuration / 2;
+    const fourBeats = beatDuration * 4; // 4 beats duration
+    
+    console.log('Starting central beat scheduler');
+    
+    this.centralBeatScheduler = setInterval(() => {
+      this.globalBeatCounter++;
+      this.lastBeatTime = Date.now();
+      
+      // Play all active layers based on the central beat
+      if (this.activeLayers.has('kick')) {
+        this.createKickDrum();
+      }
+      
+      if (this.activeLayers.has('hats')) {
+        // Offset hats by 8th note
+        setTimeout(() => this.createHats(), eighthNote);
+      }
+      
+      if (this.activeLayers.has('bass')) {
+        // Select new chord every 4 beats, but play every beat
+        this.bassBeatCounter++;
+        if (this.bassBeatCounter % 4 === 1) {
+          // Select new chord on beats 1, 5, 9, etc.
+          this.selectRandomChord();
+        }
+        this.createBassline();
+      }
+      
+      if (this.activeLayers.has('chords') && this.globalBeatCounter % 4 === 1) {
+        // Chords play every 4 beats on beat 1
+        this.createChords();
+      }
+    }, beatDuration);
+  }
+
+  stopCentralBeatScheduler() {
+    if (this.centralBeatScheduler) {
+      clearInterval(this.centralBeatScheduler);
+      this.centralBeatScheduler = null;
+      console.log('Stopped central beat scheduler');
+    }
   }
 
   startSoundtrackForCurrentLevel() {
@@ -651,76 +722,22 @@ export class AudioManager {
     
     console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Starting layers:`, activeLayers);
     
-    // Stop all layers
-    Object.keys(this.soundtrackLayers).forEach(layer => {
-      if (this.soundtrackLayers[layer]) {
-        this.stopLayer(layer);
-      }
-    });
+    // Initialize global beat tracking for first start
+    this.globalBeatCounter = 0;
+    this.lastBeatTime = Date.now();
     
-    // Start active layers
-    activeLayers.forEach(layer => {
-      this.startLayer(layer);
-    });
-  }
-
-  startLayer(layerName) {
-    if (!this.audioContext || this.soundtrackLayers[layerName]) return;
+    // Clear any existing layers and start fresh
+    this.stopCentralBeatScheduler();
+    this.activeLayers.clear();
     
-    const beatDuration = 60000 / this.bpm; // milliseconds per beat
-    const eighthNote = beatDuration / 2;
-    const fourBeats = beatDuration * 4; // 4 beats duration
-    
-    const playLayer = () => {
-      if (!this.soundtrackLayers[layerName]) return;
-      
-      switch (layerName) {
-        case 'kick':
-          this.createKickDrum();
-          break;
-        case 'hats':
-          // Offset hats by 8th note
-          setTimeout(() => this.createHats(), eighthNote);
-          break;
-        case 'bass':
-          // Select new chord every 4 beats, but play every beat
-          this.bassBeatCounter++;
-          if (this.bassBeatCounter % 4 === 1) {
-            // Select new chord on beats 1, 5, 9, etc.
-            this.selectRandomChord();
-          }
-          this.createBassline();
-          break;
-        case 'chords':
-          this.createChords();
-          break;
-      }
-    };
-    
-    // Start the layer loop with different intervals
-    if (layerName === 'chords') {
-      // Chords play every 4 beats
-      this.soundtrackLayers[layerName] = setInterval(playLayer, fourBeats);
-    } else {
-      // Other layers play every beat
-      this.soundtrackLayers[layerName] = setInterval(playLayer, beatDuration);
-    }
-    
-    // Play immediately
-    playLayer();
-  }
-
-  stopLayer(layerName) {
-    if (this.soundtrackLayers[layerName]) {
-      clearInterval(this.soundtrackLayers[layerName]);
-      this.soundtrackLayers[layerName] = null;
-    }
+    // Set up active layers and start central scheduler
+    activeLayers.forEach(layer => this.activeLayers.add(layer));
+    this.startCentralBeatScheduler();
   }
 
   stopAllLayers() {
-    Object.keys(this.soundtrackLayers).forEach(layer => {
-      this.stopLayer(layer);
-    });
+    this.stopCentralBeatScheduler();
+    this.activeLayers.clear();
   }
 
   // Robot voice using Web Speech API with robot-like parameters
