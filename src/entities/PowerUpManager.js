@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
+const debug = false;
+
 export class PowerUpManager {
   constructor(scene) {
     this.scene = scene;
@@ -68,19 +70,19 @@ export class PowerUpManager {
       type: type // Store power-up type
     };
     
-    console.log(`${type} power-up created at position:`, powerUp.position);
+    if (debug) console.log(`${type} power-up created at position:`, powerUp.position);
     this.scene.add(powerUp);
     this.powerUps.push(powerUp);
-    console.log('Total power-ups:', this.powerUps.length);
+    if (debug) console.log('Total power-ups:', this.powerUps.length);
     return powerUp;
   }
 
-  update(gameState, player) {
+  update(gameState, player, enemyManager) {
     // Power-up spawning
-    if (gameState.isPlaying) {
+    if (gameState.isPlaying && enemyManager && enemyManager.enemies.length > 0) {
       this.spawnTimer++;
       if (this.spawnTimer >= GAME_CONFIG.POWERUP_SPAWN_INTERVAL) {
-        console.log('Spawning power-up!');
+        if (debug) console.log('Spawning power-up!');
         
         // Determine power-up type based on player's wing status
         let powerUpType;
@@ -88,17 +90,17 @@ export class PowerUpManager {
         const hasAny = player.hasAnyWing();
         const missingWing = player.getMissingWing();
         
-        console.log('Wing status:', { hasBoth, hasAny, missingWing, leftWing: !!player.leftWing, rightWing: !!player.rightWing });
+        if (debug) console.log('Wing status:', { hasBoth, hasAny, missingWing, leftWing: !!player.leftWing, rightWing: !!player.rightWing });
         
         if (hasBoth) {
           // Player has both wings, only spawn blue power-ups
           powerUpType = 'blue';
-          console.log('Player has both wings, spawning blue power-up');
+          if (debug) console.log('Player has both wings, spawning blue power-up');
         } else {
           // Player missing wings, can spawn red power-ups
           const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
           powerUpType = shouldSpawnRed ? 'red' : 'blue';
-          console.log(`Player missing wings, spawning ${powerUpType} power-up (red chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
+          if (debug) console.log(`Player missing wings, spawning ${powerUpType} power-up (red chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
         }
         
         this.createPowerUp(powerUpType);
@@ -143,12 +145,12 @@ export class PowerUpManager {
       
       // Debug: log position occasionally
       if (Math.floor(powerUp.userData.pulseTime * 10) % 60 === 0) {
-        console.log('Power-up at y:', powerUp.position.y);
+        if (debug) console.log('Power-up at y:', powerUp.position.y);
       }
       
       // Remove if fallen off screen
       if (powerUp.position.y < -8) {
-        console.log('Power-up removed (fell off screen)');
+        if (debug) console.log('Power-up removed (fell off screen)');
         this.scene.remove(powerUp);
         this.powerUps.splice(i, 1);
       }
@@ -170,7 +172,7 @@ export class PowerUpManager {
       // Handle different power-up types
       const powerUpType = powerUp.userData.type;
       if (powerUpType === 'red') {
-        console.log('Red power-up collected! (Both wings upgrade)');
+        if (debug) console.log('Red power-up collected! (Both wings upgrade)');
         
         // Add both wings if missing
         let wingsAdded = [];
@@ -184,14 +186,14 @@ export class PowerUpManager {
         }
         
         if (wingsAdded.length > 0) {
-          console.log(`Wings added: ${wingsAdded.join(', ')}`);
+          if (debug) console.log(`Wings added: ${wingsAdded.join(', ')}`);
           return { type: 'red', wingsAdded: wingsAdded };
         } else {
-          console.log('Player already has both wings!');
+          if (debug) console.log('Player already has both wings!');
           return { type: 'red', wingsAdded: [] };
         }
       } else {
-        console.log('Blue power-up collected! (Standard effect)');
+        if (debug) console.log('Blue power-up collected! (Standard effect)');
         return { type: 'blue' };
       }
     }

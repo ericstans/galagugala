@@ -12,12 +12,39 @@ export class EnemyManager {
     this.createEnemies();
   }
 
-  createEnemies() {
+  createEnemies(level = 1) {
     this.enemies = [];
-    for (let row = 0; row < GAME_CONFIG.ENEMY_ROWS; row++) {
-      for (let col = 0; col < GAME_CONFIG.ENEMY_COLS; col++) {
-        const enemy = new THREE.Mesh(this.enemyGeometry, this.enemyMaterial.clone());
-        const formationX = (col - GAME_CONFIG.ENEMY_COLS / 2 + 0.5) * GAME_CONFIG.ENEMY_X_SPACING;
+    
+    // Calculate level-based enemy formation size
+    const baseRows = GAME_CONFIG.ENEMY_ROWS;
+    const baseCols = GAME_CONFIG.ENEMY_COLS;
+    
+    // Increase columns every 2 levels, rows every 3 levels
+    const additionalCols = Math.floor((level - 1) / 2);
+    const additionalRows = Math.floor((level - 1) / 3);
+    
+    const totalRows = Math.min(baseRows + additionalRows, 8); // Cap at 8 rows
+    const totalCols = Math.min(baseCols + additionalCols, 12); // Cap at 12 columns
+    
+    // Calculate dynamic enemy size based on formation size
+    const maxFormationWidth = (totalCols - 1) * GAME_CONFIG.ENEMY_X_SPACING;
+    const maxFormationHeight = (totalRows - 1) * GAME_CONFIG.ENEMY_Y_SPACING;
+    const formationArea = maxFormationWidth * maxFormationHeight;
+    
+    // Scale enemy size inversely with formation area (larger formations = smaller enemies)
+    const baseEnemySize = 0.7;
+    const sizeScale = Math.max(0.4, Math.min(1.0, 1.0 - (formationArea - 20) * 0.01));
+    const enemySize = baseEnemySize * sizeScale;
+    
+    // Create new geometry with scaled size
+    const scaledGeometry = new THREE.BoxGeometry(enemySize, enemySize, enemySize * 0.4);
+    
+    console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}`);
+    
+    for (let row = 0; row < totalRows; row++) {
+      for (let col = 0; col < totalCols; col++) {
+        const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
+        const formationX = (col - totalCols / 2 + 0.5) * GAME_CONFIG.ENEMY_X_SPACING;
         const formationY = row * GAME_CONFIG.ENEMY_Y_SPACING + 1.5;
         enemy.position.set(formationX, formationY, 0);
         enemy.userData = {

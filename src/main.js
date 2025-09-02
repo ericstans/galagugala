@@ -21,6 +21,9 @@ class Game {
     this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
     
+    // Level progression
+    this.currentLevel = 1;
+    
     this.audioStarted = false;
   }
   
@@ -61,10 +64,14 @@ class Game {
     this.enemies.update(this.player, gameState, this.audio);
     
     // Update power-ups
-    this.powerUps.update(gameState, this.player);
+    this.powerUps.update(gameState, this.player, this.enemies);
     
     // Update effects
-    const completedExplosion = this.effects.update();
+    const effectsResult = this.effects.update();
+    const completedExplosion = effectsResult && effectsResult.explosion ? effectsResult.explosion : null;
+    const levelCompleteFinished = effectsResult && effectsResult.levelCompleteFinished;
+    const levelCompleteColor = effectsResult && effectsResult.levelCompleteColor;
+    const gameOverFinished = effectsResult && effectsResult.gameOverFinished;
     
     // Check collisions
     this.checkCollisions();
@@ -72,8 +79,13 @@ class Game {
     // Update UI status
     this.overlay.updateInvulnerabilityStatus(this.player.isInvulnerable);
     
+    // Update level complete text colors
+    if (levelCompleteColor) {
+      this.overlay.updateLevelCompleteColors(levelCompleteColor);
+    }
+    
     // Check game state
-    this.checkGameState(completedExplosion);
+    this.checkGameState(completedExplosion, levelCompleteFinished, gameOverFinished);
   }
   
   checkCollisions() {
@@ -131,7 +143,7 @@ class Game {
     }
   }
   
-  checkGameState(completedExplosion) {
+  checkGameState(completedExplosion, levelCompleteFinished, gameOverFinished) {
     const gameState = this.engine.getGameState();
     
     // Check wing-enemy collisions first (only if not invulnerable)
@@ -190,17 +202,69 @@ class Game {
     // Handle explosion completion
     if (completedExplosion && gameState.playerDestroyed && !gameState.explosionComplete) {
       this.engine.setGameState({ explosionComplete: true });
+      console.log('Player destroyed! Starting Game Over animation...');
       this.audio.playGameOver();
-      this.overlay.showOverlay('Game Over');
+      this.effects.startGameOverAnimation();
+      return;
+    }
+    
+    // Fallback: Start Game Over animation immediately if player is destroyed
+    if (gameState.playerDestroyed && !this.effects.gameOverAnimation) {
+      console.log('Player destroyed! Starting Game Over animation immediately...');
+      this.audio.playGameOver();
+      this.effects.startGameOverAnimation();
+      this.engine.setGameState({ explosionComplete: true });
+      return;
+    }
+    
+    // Handle game over animation finished
+    if (gameOverFinished) {
+      console.log('Game Over animation finished!');
+      // Game stays in game over state - could add restart logic here
+      return;
+    }
+
+    // Level complete condition (only if game is still playing)
+    if (this.enemies.enemies.length === 0 && gameState.isPlaying && !this.effects.levelCompleteAnimation) {
+      console.log('All enemies destroyed! Starting level complete animation...');
+      this.effects.startLevelCompleteAnimation();
+      this.overlay.showLevelComplete();
     return;
   }
 
-    // Win condition (only if game is still playing)
-    if (this.enemies.enemies.length === 0 && gameState.isPlaying) {
-      this.audio.playWin();
-      this.overlay.showOverlay('You Win!');
+    // Handle level complete animation finished
+    if (levelCompleteFinished) {
+      console.log('Level complete animation finished! Starting next level...');
+      this.overlay.hideLevelComplete();
+      this.startNextLevel();
       return;
     }
+  }
+
+  startNextLevel() {
+    this.currentLevel++;
+    console.log(`Starting level ${this.currentLevel}...`);
+    
+    // Reset game state
+    this.engine.resetGameState();
+    
+    // Clear all effects
+    this.effects.clearAll();
+    
+    // Reset player position and state
+    this.player.reset();
+    
+    // Clear all enemies and power-ups
+    this.enemies.clearAll();
+    this.powerUps.clearAll();
+    
+    // Spawn new enemies for the next level with level-based scaling
+    this.enemies.createEnemies(this.currentLevel);
+    
+    // Play level start sound (if you want to add one)
+    // this.audio.playLevelStart();
+    
+    console.log(`Level ${this.currentLevel} started!`);
   }
 }
 

@@ -86,6 +86,44 @@ export class OverlayManager {
     }
   }
 
+  showLevelComplete() {
+    let levelCompleteOverlay = document.getElementById('level-complete-overlay');
+    if (!levelCompleteOverlay) {
+      levelCompleteOverlay = document.createElement('div');
+      levelCompleteOverlay.id = 'level-complete-overlay';
+      levelCompleteOverlay.style.position = 'fixed';
+      levelCompleteOverlay.style.top = '50%';
+      levelCompleteOverlay.style.left = '50%';
+      levelCompleteOverlay.style.transform = 'translate(-50%, -50%)';
+      levelCompleteOverlay.style.fontSize = '4rem';
+      levelCompleteOverlay.style.fontFamily = 'Arial, sans-serif';
+      levelCompleteOverlay.style.fontWeight = 'bold';
+      levelCompleteOverlay.style.textAlign = 'center';
+      levelCompleteOverlay.style.zIndex = '1001';
+      levelCompleteOverlay.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+      levelCompleteOverlay.style.display = 'none';
+      document.body.appendChild(levelCompleteOverlay);
+    }
+    
+    levelCompleteOverlay.textContent = 'LEVEL COMPLETE';
+    levelCompleteOverlay.style.display = 'block';
+    return levelCompleteOverlay;
+  }
+
+  hideLevelComplete() {
+    const levelCompleteOverlay = document.getElementById('level-complete-overlay');
+    if (levelCompleteOverlay) {
+      levelCompleteOverlay.style.display = 'none';
+    }
+  }
+
+  updateLevelCompleteColors(color) {
+    const levelCompleteOverlay = document.getElementById('level-complete-overlay');
+    if (levelCompleteOverlay) {
+      levelCompleteOverlay.style.color = `#${color.getHexString()}`;
+    }
+  }
+
   hideOverlay() {
     this.overlay.style.display = 'none';
   }

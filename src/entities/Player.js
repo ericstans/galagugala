@@ -400,4 +400,37 @@ export class Player {
     this.scene.remove(this.mesh);
     // Cockpit and wings are automatically removed as they're children
   }
+
+  reset() {
+    console.log('Resetting player...');
+    
+    // Reset position
+    this.mesh.position.set(0, -6.5, 0);
+    
+    // Clear all bullets
+    this.bullets.forEach(bullet => {
+      this.scene.remove(bullet);
+    });
+    this.bullets = [];
+    
+    // Clear wing bullets
+    this.wingBullets.forEach(bullet => {
+      this.scene.remove(bullet);
+    });
+    this.wingBullets = [];
+    
+    // Reset shooting cooldowns
+    this.canShoot = true;
+    this.canShootWings = true;
+    
+    // Reset invulnerability
+    this.isInvulnerable = false;
+    this.invulnerabilityFlashTimer = 0;
+    this.originalMaterials.clear();
+    
+    // Keep existing wings (don't remove ship enhancements)
+    // Wings will remain attached to the player ship
+    
+    console.log('Player reset complete');
+  }
 }

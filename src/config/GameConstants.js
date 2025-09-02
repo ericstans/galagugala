@@ -3,6 +3,10 @@ export const GAME_CONFIG = {
   // Player settings
   PLAYER_SPEED: 0.08,
   
+  // Fire rate settings (frames between shots)
+  PRIMARY_FIRE_RATE: 20, // frames between primary shots
+  WING_FIRE_RATE: 30, // frames between wing shots
+  
   // Bullet settings
   BULLET_SPEED: 0.2,
   

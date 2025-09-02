@@ -64,4 +64,12 @@ export class GameEngine {
   getGameState() {
     return this.gameState;
   }
+
+  resetGameState() {
+    this.gameState = {
+      isPlaying: true,
+      playerDestroyed: false,
+      explosionComplete: false
+    };
+  }
 }
