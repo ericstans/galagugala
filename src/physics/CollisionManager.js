@@ -73,4 +73,63 @@ export class CollisionManager {
     }
     return null;
   }
+
+  // Process all collisions and return results
+  static processAllCollisions(player, enemies, powerUps, audioManager, gameState) {
+    const results = {
+      bulletCollisions: [],
+      wingBulletCollisions: [],
+      powerUpCollisions: [],
+      wingCollisions: [],
+      playerCollisions: []
+    };
+
+    // Main bullet-enemy collision
+    const bulletCollision = this.checkBulletEnemyCollision(
+      player.bullets, 
+      enemies, 
+      audioManager
+    );
+    
+    if (bulletCollision) {
+      results.bulletCollisions.push(bulletCollision);
+    }
+    
+    // Wing bullet-enemy collision
+    const wingBulletCollision = this.checkWingBulletEnemyCollision(
+      player.wingBullets,
+      enemies,
+      audioManager
+    );
+    
+    if (wingBulletCollision) {
+      results.wingBulletCollisions.push(wingBulletCollision);
+    }
+    
+    // Player-power-up collision
+    if (gameState.isPlaying && !gameState.playerDestroyed) {
+      const powerUpResult = powerUps.checkCollisions(player, audioManager);
+      if (powerUpResult) {
+        results.powerUpCollisions.push(powerUpResult);
+      }
+    }
+    
+    // Check wing-enemy collisions first (only if not invulnerable)
+    if (!player.isInvulnerable) {
+      const wingCollision = this.checkWingEnemyCollision(player, enemies);
+      if (wingCollision && !gameState.playerDestroyed) {
+        results.wingCollisions.push(wingCollision);
+      }
+    }
+    
+    // Game over (enemy reaches player) - only if not invulnerable
+    if (!player.isInvulnerable) {
+      const enemyCollision = this.checkPlayerEnemyCollision(player, enemies);
+      if (enemyCollision && !gameState.playerDestroyed) {
+        results.playerCollisions.push(enemyCollision);
+      }
+    }
+
+    return results;
+  }
 }
