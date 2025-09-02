@@ -89,6 +89,36 @@ class Game {
     this.score += points;
     this.overlay.updateScore(this.score);
   }
+
+  startFinalBossExplosion(boss) {
+    if (DEBUG) console.log('Starting final boss explosion sequence');
+    
+    // Stop the boss from firing and moving
+    boss.userData.isDestroyed = true;
+    boss.userData.fireCooldown = 999999; // Prevent firing
+    
+    // Start the explosion sequence
+    this.effects.startFinalBossExplosion(boss, () => {
+      // Callback when explosion sequence is complete
+      this.endGame();
+    });
+  }
+
+  endGame() {
+    if (DEBUG) console.log('Game ended - Final score:', this.score);
+    
+    // Stop the game loop
+    this.engine.setGameState({ isPlaying: false, gameEnded: true });
+    
+    // Stop audio
+    this.audio.stopCentralBeatScheduler();
+    
+    // Show final score screen
+    this.overlay.showFinalScore(this.score, this.currentLevel);
+    
+    // Announce game completion with robot voice
+    this.audio.createRobotSpeech("Game Complete");
+  }
   
   init() {
     this.engine.init();
@@ -365,9 +395,16 @@ class Game {
           this.addScore(bossDestroyScore);
           this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
           
+          // Check if this is the final boss
+          if (enemy.userData.isFinalBoss) {
+            // Final boss destroyed - start dramatic explosion sequence
+            this.startFinalBossExplosion(enemy);
+            return;
+          }
+          
           // Remove boss
           this.enemies.removeEnemy(enemy, (position) => {
-            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
           });
         }
       } else {
@@ -382,7 +419,7 @@ class Game {
         
         // Remove enemy with power-up callback
         this.enemies.removeEnemy(enemy, (position) => {
-          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
         });
         
         // Play hit sound
@@ -427,9 +464,16 @@ class Game {
           this.addScore(bossDestroyScore);
           this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
           
+          // Check if this is the final boss
+          if (enemy.userData.isFinalBoss) {
+            // Final boss destroyed - start dramatic explosion sequence
+            this.startFinalBossExplosion(enemy);
+            return;
+          }
+          
           // Remove boss
           this.enemies.removeEnemy(enemy, (position) => {
-            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
           });
         }
       } else {
@@ -444,7 +488,7 @@ class Game {
         
         // Remove enemy with power-up callback
         this.enemies.removeEnemy(enemy, (position) => {
-          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
         });
         
         // Play hit sound
@@ -581,7 +625,7 @@ class Game {
             
             // Remove boss
             this.enemies.removeEnemy(enemy, (position) => {
-              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
             });
           }
         } else {
@@ -596,7 +640,7 @@ class Game {
           
           // Remove enemy with power-up callback
           this.enemies.removeEnemy(enemy, (position) => {
-            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
           });
         }
         
@@ -640,13 +684,13 @@ class Game {
               
               // Remove boss
               this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
-                this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+                this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
               });
             }
           } else {
             // Normal enemy - remove immediately
             this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
-              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
             });
           }
           
@@ -795,6 +839,10 @@ class Game {
       // Level 50 boss
       if (DEBUG) console.log(`Level 50 detected - spawning boss instead of enemies`);
       this.enemies.createBoss(this.engine);
+    } else if (this.currentLevel === 100) {
+      // Level 100 final boss
+      if (DEBUG) console.log(`Level 100 detected - spawning final boss instead of enemies`);
+      this.enemies.createFinalBoss(this.engine);
     } else {
       // Spawn new enemies for the next level with level-based scaling
       if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
@@ -932,6 +980,10 @@ class Game {
       // Level 50 boss
       if (DEBUG) console.log(`Level 50 detected on restart - spawning boss instead of enemies`);
       this.enemies.createBoss(this.engine);
+    } else if (this.currentLevel === 100) {
+      // Level 100 final boss
+      if (DEBUG) console.log(`Level 100 detected on restart - spawning final boss instead of enemies`);
+      this.enemies.createFinalBoss(this.engine);
     } else {
       // Spawn new enemies for the restart level
       this.enemies.createEnemies(this.currentLevel, this.engine);

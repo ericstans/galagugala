@@ -592,4 +592,83 @@ export class OverlayManager {
   hideStartOverlay() {
     this.startOverlay.style.display = 'none';
   }
+
+  showFinalScore(finalScore, finalLevel) {
+    // Create final score overlay
+    let finalScoreOverlay = document.getElementById('final-score-overlay');
+    
+    if (!finalScoreOverlay) {
+      finalScoreOverlay = document.createElement('div');
+      finalScoreOverlay.id = 'final-score-overlay';
+      finalScoreOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        color: white;
+        font-family: 'Courier New', monospace;
+        text-align: center;
+      `;
+      
+      // Title
+      const title = document.createElement('h1');
+      title.textContent = 'GAME COMPLETE';
+      title.style.cssText = `
+        font-size: 3em;
+        margin: 0 0 20px 0;
+        color: #00ff00;
+        text-shadow: 0 0 10px #00ff00;
+      `;
+      finalScoreOverlay.appendChild(title);
+      
+      // Final level
+      const levelText = document.createElement('div');
+      levelText.textContent = `Final Level: ${finalLevel}`;
+      levelText.style.cssText = `
+        font-size: 1.5em;
+        margin: 0 0 20px 0;
+        color: #ffff00;
+      `;
+      finalScoreOverlay.appendChild(levelText);
+      
+      // Final score
+      const scoreText = document.createElement('div');
+      scoreText.textContent = `Final Score: ${finalScore.toLocaleString()}`;
+      scoreText.style.cssText = `
+        font-size: 2em;
+        margin: 0 0 30px 0;
+        color: #ff8800;
+        font-weight: bold;
+      `;
+      finalScoreOverlay.appendChild(scoreText);
+      
+      // Instructions
+      const instructions = document.createElement('div');
+      instructions.textContent = 'Press R to restart or refresh the page';
+      instructions.style.cssText = `
+        font-size: 1.2em;
+        color: #cccccc;
+        margin-top: 20px;
+      `;
+      finalScoreOverlay.appendChild(instructions);
+      
+      document.body.appendChild(finalScoreOverlay);
+    }
+    
+    // Update the score and level
+    const levelText = finalScoreOverlay.children[1];
+    const scoreText = finalScoreOverlay.children[2];
+    levelText.textContent = `Final Level: ${finalLevel}`;
+    scoreText.textContent = `Final Score: ${finalScore.toLocaleString()}`;
+    
+    // Show the overlay
+    finalScoreOverlay.style.display = 'flex';
+  }
 }

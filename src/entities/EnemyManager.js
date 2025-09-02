@@ -272,6 +272,17 @@ export class EnemyManager {
     this.enemies.forEach(enemy => {
       // Handle boss rotation and firing
       if (enemy.userData.isBoss) {
+        // Check if boss is destroyed (for final boss explosion sequence)
+        if (enemy.userData.isDestroyed) {
+          // Boss is destroyed - only continue rotation, no movement or firing
+          enemy.children.forEach(cube => {
+            cube.rotation.x += cube.userData.rotationSpeed;
+            cube.rotation.y += cube.userData.rotationSpeed;
+            cube.rotation.z += cube.userData.rotationSpeed;
+          });
+          return; // Skip movement and firing
+        }
+        
         // Rotate each cube in the boss group
         enemy.children.forEach(cube => {
           cube.rotation.x += cube.userData.rotationSpeed;
@@ -1137,6 +1148,74 @@ export class EnemyManager {
     this.enemies.push(bossGroup);
     
     if (DEBUG) console.log('Boss created with 10 cubes');
+  }
+
+  createFinalBoss(gameEngine) {
+    if (DEBUG) console.log('Creating Level 100 Final Boss');
+    
+    // Clear any existing enemies
+    this.clearAll();
+    
+    // Create final boss group
+    const bossGroup = new THREE.Group();
+    bossGroup.userData = {
+      type: 'finalBoss',
+      health: 200, // Final boss takes 200 hits to destroy
+      maxHealth: 200,
+      isBoss: true,
+      isFinalBoss: true, // Special flag for final boss
+      rotationSpeed: 0.03, // Faster rotation than level 50 boss
+      fireCooldown: 0, // Boss firing cooldown (20 frames = 0.33 seconds at 60fps)
+      currentBulletType: 0, // Index for cycling through bullet types
+      bulletTypes: ['green', 'red', 'yellow'], // Available bullet types
+      moveSpeed: 3.0, // Faster horizontal movement
+      moveDirection: 1, // 1 for right, -1 for left
+      moveRange: 4, // Larger movement range
+      moveTime: 0 // Time counter for movement
+    };
+    
+    // Create 15 large overlapping cubes (more than level 50 boss)
+    for (let i = 0; i < 15; i++) {
+      const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8); // Larger cubes than level 50 boss
+      const material = new THREE.MeshBasicMaterial({ 
+        color: 0xff0080, // Pink/magenta color for final boss
+        wireframe: true,
+        transparent: true,
+        opacity: 0.9
+      });
+      
+      const cube = new THREE.Mesh(geometry, material);
+      
+      // Random position within a larger area (more spread out)
+      cube.position.x = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+      cube.position.y = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+      cube.position.z = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+      
+      // Random rotation angles
+      cube.rotation.x = Math.random() * Math.PI * 2;
+      cube.rotation.y = Math.random() * Math.PI * 2;
+      cube.rotation.z = Math.random() * Math.PI * 2;
+      
+      // Store rotation speed
+      cube.userData.rotationSpeed = bossGroup.userData.rotationSpeed;
+      
+      // Store reference to boss for health updates
+      cube.userData.boss = bossGroup;
+      
+      bossGroup.add(cube);
+    }
+    
+    // Position boss in the center of the screen
+    const bounds = gameEngine.getVisibleBounds();
+    bossGroup.position.x = 0;
+    bossGroup.position.y = bounds.top - 2; // Near the top
+    bossGroup.position.z = 0;
+    
+    // Add to scene and enemies array
+    this.scene.add(bossGroup);
+    this.enemies.push(bossGroup);
+    
+    if (DEBUG) console.log('Final boss created with 15 cubes');
   }
 
   shootBossBullet(boss, player) {

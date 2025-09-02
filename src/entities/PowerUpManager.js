@@ -177,12 +177,22 @@ export class PowerUpManager {
           wingsAdded.push('right');
         }
         
+        // Check if player already has both wings (Power Up Level 2 upgrade)
+        let powerUpLevel2Upgraded = false;
+        if (wingsAdded.length === 0 && player.hasBothWings()) {
+          // Player already has both wings, upgrade to Power Up Level 2
+          powerUpLevel2Upgraded = player.upgradeToPowerUpLevel2();
+        }
+        
         if (wingsAdded.length > 0) {
           if (DEBUG) console.log(`Wings added: ${wingsAdded.join(', ')}`);
-          return { type: 'red', wingsAdded: wingsAdded };
+          return { type: 'red', wingsAdded: wingsAdded, powerUpLevel2Upgraded: false };
+        } else if (powerUpLevel2Upgraded) {
+          if (DEBUG) console.log('Player upgraded to Power Up Level 2!');
+          return { type: 'red', wingsAdded: [], powerUpLevel2Upgraded: true };
         } else {
-          if (DEBUG) console.log('Player already has both wings!');
-          return { type: 'red', wingsAdded: [] };
+          if (DEBUG) console.log('Player already has both wings and is already at Power Up Level 2!');
+          return { type: 'red', wingsAdded: [], powerUpLevel2Upgraded: false };
         }
       } else {
         if (DEBUG) console.log('Blue power-up collected! (Standard effect)');
@@ -262,19 +272,24 @@ export class PowerUpManager {
   }
 
   // Spawn power-up when a column is destroyed
-  spawnPowerUpOnColumnDestroyed(player, position = null) {
+  spawnPowerUpOnColumnDestroyed(player, position = null, currentLevel = 1) {
     if (DEBUG) console.log('Column destroyed! Spawning power-up...');
     
-    // Determine power-up type based on player's wing status
+    // Determine power-up type based on player's wing status, level, and power-up level
     let powerUpType;
     const hasBoth = player.hasBothWings();
+    const isPowerUpLevel2 = player.powerUpLevel === 2;
     
-    if (hasBoth) {
-      // Player has both wings, only spawn blue power-ups
+    if (hasBoth && currentLevel <= 50) {
+      // Player has both wings and level 50 or below, only spawn blue power-ups
       powerUpType = 'blue';
-      if (DEBUG) console.log('Player has both wings, spawning blue power-up');
+      if (DEBUG) console.log('Player has both wings (level <= 50), spawning blue power-up');
+    } else if (isPowerUpLevel2) {
+      // Player is at Power Up Level 2, only spawn blue power-ups
+      powerUpType = 'blue';
+      if (DEBUG) console.log('Player is Power Up Level 2, spawning blue power-up');
     } else {
-      // Player missing wings, can spawn red power-ups
+      // Player missing wings OR level 51+ (but not Power Up Level 2), can spawn red power-ups
       const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
       
       // Check if a red power-up is already on screen
@@ -282,7 +297,13 @@ export class PowerUpManager {
       
       if (shouldSpawnRed && !hasRedPowerUp) {
         powerUpType = 'red';
-        if (DEBUG) console.log('Spawning red power-up (no red power-up on screen)');
+        if (DEBUG) {
+          if (currentLevel > 50) {
+            console.log('Spawning red power-up (level > 50, Power Up Level 2 possible)');
+          } else {
+            console.log('Spawning red power-up (no red power-up on screen)');
+          }
+        }
       } else {
         powerUpType = 'blue';
         if (DEBUG) {

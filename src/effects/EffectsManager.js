@@ -116,9 +116,13 @@ export class EffectsManager {
     // Explosion animations
     for (let i = this.explosions.length - 1; i >= 0; i--) {
       const explosion = this.explosions[i];
-      explosion.time++;
       
-      explosion.particles.forEach(particle => {
+      // Handle different explosion types
+      if (explosion.particles) {
+        // Old explosion system
+        explosion.time++;
+        
+        explosion.particles.forEach(particle => {
         // Update particle position
         particle.position.add(particle.userData.velocity);
         
@@ -142,6 +146,11 @@ export class EffectsManager {
         });
         this.explosions.splice(i, 1);
         return explosion; // Return completed explosion for game state handling
+      }
+      } else if (explosion.children) {
+        // New massive explosion system - these are handled by their own animation
+        // Just skip them here as they manage their own lifecycle
+        continue;
       }
     }
     return null;
@@ -690,5 +699,169 @@ export class EffectsManager {
     }
     
     this.portalAnimation = null;
+  }
+
+  startFinalBossExplosion(boss, onComplete) {
+    if (DEBUG) console.log('Starting final boss explosion sequence');
+    
+    // Store the callback
+    this.finalBossExplosionCallback = onComplete;
+    this.finalBossExplosionActive = true;
+    this.finalBossExplosionPhase = 0;
+    this.finalBossExplosionTimer = 0;
+    this.finalBossExplosionBoss = boss;
+    this.finalBossExplosionCubes = [...boss.children]; // Copy the cubes array
+    
+    // Start the explosion sequence
+    this.finalBossExplosionSequence();
+  }
+
+  finalBossExplosionSequence() {
+    if (!this.finalBossExplosionActive) return;
+    
+    this.finalBossExplosionTimer++;
+    
+    // Phase 1: Initial large explosion (0-60 frames)
+    if (this.finalBossExplosionPhase === 0) {
+      if (this.finalBossExplosionTimer === 1) {
+        // Create massive initial explosion
+        this.createMassiveExplosion(this.finalBossExplosionBoss.position, 0xff0000, 3.0, 50);
+        this.audioManager.playExplosion();
+      }
+      
+      if (this.finalBossExplosionTimer >= 60) {
+        this.finalBossExplosionPhase = 1;
+        this.finalBossExplosionTimer = 0;
+      }
+    }
+    // Phase 2: Individual cube explosions (60-180 frames)
+    else if (this.finalBossExplosionPhase === 1) {
+      // Explode one cube every 8 frames
+      if (this.finalBossExplosionTimer % 8 === 0 && this.finalBossExplosionCubes.length > 0) {
+        const cube = this.finalBossExplosionCubes.shift();
+        if (cube) {
+          // Get cube world position
+          const worldPos = new THREE.Vector3();
+          cube.getWorldPosition(worldPos);
+          
+          // Create explosion at cube position
+          this.createMassiveExplosion(worldPos, 0xff8800, 1.5, 30);
+          
+          // Remove cube from scene
+          this.finalBossExplosionBoss.remove(cube);
+          this.scene.remove(cube);
+          
+          // Play explosion sound
+          this.audioManager.playExplosion();
+        }
+      }
+      
+      if (this.finalBossExplosionTimer >= 120) {
+        this.finalBossExplosionPhase = 2;
+        this.finalBossExplosionTimer = 0;
+      }
+    }
+    // Phase 3: Final massive explosion (180-240 frames)
+    else if (this.finalBossExplosionPhase === 2) {
+      if (this.finalBossExplosionTimer === 1) {
+        // Create final massive explosion
+        this.createMassiveExplosion(this.finalBossExplosionBoss.position, 0xffffff, 4.0, 80);
+        this.audioManager.playExplosion();
+      }
+      
+      if (this.finalBossExplosionTimer >= 60) {
+        // Remove the boss from scene
+        this.scene.remove(this.finalBossExplosionBoss);
+        
+        // Complete the sequence
+        this.finalBossExplosionActive = false;
+        if (this.finalBossExplosionCallback) {
+          this.finalBossExplosionCallback();
+        }
+        return;
+      }
+    }
+    
+    // Continue the sequence
+    requestAnimationFrame(() => this.finalBossExplosionSequence());
+  }
+
+  createMassiveExplosion(position, color, scale, particleCount) {
+    const explosionGroup = new THREE.Group();
+    
+    for (let i = 0; i < particleCount; i++) {
+      const particle = new THREE.Mesh(this.explosionGeometry, new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.8
+      }));
+      
+      // Random position around the explosion center
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 2 * scale;
+      particle.position.set(
+        position.x + Math.cos(angle) * distance,
+        position.y + Math.random() * scale - scale/2,
+        position.z + Math.sin(angle) * distance
+      );
+      
+      // Random velocity
+      particle.userData = {
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.2,
+          Math.random() * 0.3,
+          (Math.random() - 0.5) * 0.2
+        ),
+        life: 60, // 1 second at 60fps
+        maxLife: 60
+      };
+      
+      explosionGroup.add(particle);
+    }
+    
+    this.scene.add(explosionGroup);
+    this.explosions.push(explosionGroup);
+    
+    // Animate the explosion
+    this.animateMassiveExplosion(explosionGroup);
+  }
+
+  animateMassiveExplosion(explosionGroup) {
+    const animate = () => {
+      let allDead = true;
+      
+      explosionGroup.children.forEach(particle => {
+        if (particle.userData.life > 0) {
+          // Update position
+          particle.position.add(particle.userData.velocity);
+          
+          // Update life
+          particle.userData.life--;
+          
+          // Fade out
+          const lifeRatio = particle.userData.life / particle.userData.maxLife;
+          particle.material.opacity = lifeRatio * 0.8;
+          
+          // Shrink
+          const scale = lifeRatio;
+          particle.scale.setScalar(scale);
+          
+          allDead = false;
+        }
+      });
+      
+      if (allDead) {
+        // Remove explosion from scene
+        this.scene.remove(explosionGroup);
+        const index = this.explosions.indexOf(explosionGroup);
+        if (index > -1) {
+          this.explosions.splice(index, 1);
+        }
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    animate();
   }
 }

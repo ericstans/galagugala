@@ -42,6 +42,10 @@ export class Player {
     this.hasShield = false;
     this.shieldBubble = null;
     
+    // Power Up Level 2 system (after level 50)
+    this.powerUpLevel = 1; // 1 = normal, 2 = enhanced wing fire rate
+    this.wingFireRateMultiplier = 1.0; // Multiplier for wing fire rate
+    
     if (DEBUG) console.log('Player created - no wings initially');
   }
 
@@ -566,6 +570,16 @@ export class Player {
     return null;
   }
 
+  upgradeToPowerUpLevel2() {
+    if (this.powerUpLevel === 1) {
+      this.powerUpLevel = 2;
+      this.wingFireRateMultiplier = 1.5; // 1.5x faster fire rate
+      if (DEBUG) console.log('Player upgraded to Power Up Level 2 - wing fire rate increased by 1.5x');
+      return true;
+    }
+    return false;
+  }
+
   update(inputManager, gameState, gameEngine) {
     let velocityX = 0;
     
@@ -653,7 +667,10 @@ export class Player {
     if (!this.canShootWings) return;
     
     const bulletGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8);
-    const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff8800 });
+    
+    // Different colors based on Power Up Level
+    const bulletColor = this.powerUpLevel === 2 ? 0xff0080 : 0xff8800; // Pink for Level 2, Orange for Level 1
+    const bulletMaterial = new THREE.MeshBasicMaterial({ color: bulletColor });
     
     // Shoot from left wing gun
     if (this.leftWing && !this.leftWing.userData.isDestroyed) {
@@ -700,7 +717,9 @@ export class Player {
     }
     
     this.canShootWings = false;
-    setTimeout(() => { this.canShootWings = true; }, 200); // slightly faster fire rate for wings
+    const baseFireRate = 200; // Base fire rate in milliseconds
+    const actualFireRate = baseFireRate / this.wingFireRateMultiplier;
+    setTimeout(() => { this.canShootWings = true; }, actualFireRate);
   }
 
   destroyWing(wing) {
