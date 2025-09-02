@@ -67,15 +67,7 @@ export class EnemyManager {
     }
 
     this.enemies.forEach(enemy => {
-      if (enemy.userData.state === 'zPlane') {
-        // Z plane enemies move toward the camera (positive Z direction)
-        enemy.position.z += enemy.userData.moveSpeed;
-        
-        // Remove if they get too close to the camera
-        if (enemy.position.z > 2) {
-          this.removeEnemy(enemy);
-        }
-      } else if (enemy.userData.state === 'formation') {
+      if (enemy.userData.state === 'formation') {
         // Small wiggle for life
         enemy.position.x = enemy.userData.formationX + Math.sin(Date.now() * 0.001 + enemy.userData.formationY) * 0.1;
         enemy.position.y = enemy.userData.formationY + Math.cos(Date.now() * 0.001 + enemy.userData.formationX) * 0.05;

@@ -14,14 +14,8 @@ export class GameEngine {
   }
 
   init() {
-    // Camera setup - ensure camera is properly aligned
-    this.camera.position.set(0, 0, 10);
-    this.camera.lookAt(0, 0, 0); // Explicitly look at origin
-    
-    // Add coordinate axes helper
-    const axesHelper = new THREE.AxesHelper(2);
-    axesHelper.position.set(-8, 6, 0); // Position in top-left corner
-    this.scene.add(axesHelper);
+    // Camera setup
+    this.camera.position.z = 10;
     
     // Renderer setup
     this.renderer.setSize(window.innerWidth, window.innerHeight);

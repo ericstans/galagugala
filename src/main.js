@@ -18,7 +18,7 @@ class Game {
     
     this.player = new Player(this.engine.scene);
     this.enemies = new EnemyManager(this.engine.scene);
-    this.powerUps = new PowerUpManager(this.engine.scene, this.enemies);
+    this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
     
     this.audioStarted = false;
@@ -112,14 +112,8 @@ class Game {
       // Remove bullet and enemy
       this.engine.scene.remove(bullet);
       this.engine.scene.remove(enemy);
-      
-      // Remove from arrays (use splice to remove by index)
-      if (bulletIndex >= 0 && bulletIndex < this.player.wingBullets.length) {
-        this.player.wingBullets.splice(bulletIndex, 1);
-      }
-      if (enemyIndex >= 0 && enemyIndex < this.enemies.enemies.length) {
-        this.enemies.enemies.splice(enemyIndex, 1);
-      }
+      this.player.wingBullets.splice(bulletIndex, 1);
+      this.enemies.enemies.splice(enemyIndex, 1);
       
       // Play hit sound
       this.audio.playHit();
@@ -130,8 +124,8 @@ class Game {
       const powerUpResult = this.powerUps.checkCollisions(this.player, this.audio);
       if (powerUpResult) {
         // Handle wing upgrades
-        if (powerUpResult.type === 'red' && powerUpResult.wingsAdded) {
-          console.log('Wing upgrade: Both wings added!');
+        if (powerUpResult.type === 'red' && powerUpResult.wingAdded) {
+          console.log(`Wing upgrade: ${powerUpResult.wingAdded} wing added!`);
         }
       }
     }

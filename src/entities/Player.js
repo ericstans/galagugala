@@ -21,11 +21,6 @@ export class Player {
     this.invulnerabilityFlashTimer = 0;
     this.originalMaterials = new Map(); // Store original materials for restoration
     
-    // Gun rotation system
-    this.gunRotationSpeed = 0.1;
-    this.targetGunRotation = 0;
-    this.currentGunRotation = 0;
-    
     console.log('Player created - no wings initially');
   }
 
@@ -91,28 +86,26 @@ export class Player {
   createWing(side) {
     const wingGroup = new THREE.Group();
     
-    // Wing body - positioned to extend from the ship
-    const wingGeometry = new THREE.BoxGeometry(0.3, 0.12, 0.06);
+    // Wing body
+    const wingGeometry = new THREE.BoxGeometry(0.4, 0.15, 0.08);
     const wingMaterial = new THREE.MeshBasicMaterial({ color: 0x00fffc });
     const wingBody = new THREE.Mesh(wingGeometry, wingMaterial);
     wingGroup.add(wingBody);
     
-    // Gun launcher at tip - facing upward
+    // Gun launcher at tip
     const gunGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8);
     const gunMaterial = new THREE.MeshBasicMaterial({ color: 0x666666 });
     const gun = new THREE.Mesh(gunGeometry, gunMaterial);
-    // Rotate gun to point upward (cylinder default is along Y axis, we want it along Z axis)
-    gun.rotation.x = -Math.PI / 2;
-    gun.position.set(side === 'left' ? -0.2 : 0.2, 0, -0.1); // Above the wing (negative Z)
+    // No rotation needed - cylinder is already oriented correctly for upward pointing
+    gun.position.set(side === 'left' ? -0.25 : 0.25, 0, 0);
     wingGroup.add(gun);
     
-    // Position wing relative to ship - lower on the ship (about half ship height down)
-    wingGroup.position.set(side === 'left' ? -0.4 : 0.4, -0.4, 0);
+    // Position wing relative to ship
+    wingGroup.position.set(side === 'left' ? -0.6 : 0.6, -0.2, 0);
     wingGroup.userData = {
       side: side,
       isDestroyed: false,
-      gunPosition: gun.position.clone(),
-      gun: gun // Store reference to gun for rotation
+      gunPosition: gun.position.clone()
     };
     
     this.mesh.add(wingGroup);
@@ -122,10 +115,10 @@ export class Player {
   addWing(side) {
     if (side === 'left' && !this.leftWing) {
       this.leftWing = this.createWing('left');
-      console.log('Left wing added! Position:', this.leftWing.position);
+      console.log('Left wing added!');
     } else if (side === 'right' && !this.rightWing) {
       this.rightWing = this.createWing('right');
-      console.log('Right wing added! Position:', this.rightWing.position);
+      console.log('Right wing added!');
     } else {
       console.log(`Cannot add ${side} wing - already exists or invalid side`);
     }
@@ -189,18 +182,7 @@ export class Player {
     // Wing bullets movement
     for (let i = this.wingBullets.length - 1; i >= 0; i--) {
       const bullet = this.wingBullets[i];
-      
-      // Move bullet in the direction it was fired
-      if (bullet.userData && bullet.userData.direction) {
-        const direction = bullet.userData.direction;
-        bullet.position.x += direction.x * GAME_CONFIG.BULLET_SPEED;
-        bullet.position.y += direction.y * GAME_CONFIG.BULLET_SPEED;
-        bullet.position.z += direction.z * GAME_CONFIG.BULLET_SPEED;
-      } else {
-        // Fallback to straight up movement
-        bullet.position.y += GAME_CONFIG.BULLET_SPEED;
-      }
-      
+      bullet.position.y += GAME_CONFIG.BULLET_SPEED;
       if (bullet.position.y > 8) {
         this.scene.remove(bullet);
         this.wingBullets.splice(i, 1);
@@ -209,9 +191,6 @@ export class Player {
 
     // Update invulnerability flash effect
     this.updateInvulnerabilityFlash();
-
-    // Update gun rotation based on movement
-    this.updateGunRotation(inputManager);
 
     return null;
   }
@@ -239,59 +218,23 @@ export class Player {
     const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff8800 });
     
     // Shoot from left wing
-    if (this.leftWing && !this.leftWing.userData.isDestroyed && this.leftWing.userData.gun) {
+    if (this.leftWing && !this.leftWing.userData.isDestroyed) {
       const leftBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
       const leftWingWorldPos = new THREE.Vector3();
       this.leftWing.getWorldPosition(leftWingWorldPos);
       leftBullet.position.copy(leftWingWorldPos);
-      
-      // Calculate bullet direction based on actual gun orientation
-      const gun = this.leftWing.userData.gun;
-      const bulletDirection = new THREE.Vector3(0, 0, 1); // Default direction toward camera
-      bulletDirection.applyQuaternion(gun.quaternion); // Apply gun's actual rotation
-      
-      // Remove Y component to keep bullets flat in 3D space
-      bulletDirection.y = 0;
-      
-      // Ensure bullets always move toward camera (positive Z)
-      if (bulletDirection.z < 0) {
-        bulletDirection.z = -bulletDirection.z;
-      }
-      
-      bulletDirection.normalize(); // Re-normalize after adjustments
-      
-      // Store direction in bullet for movement
-      leftBullet.userData = { direction: bulletDirection };
-      
+      leftBullet.position.y += 0.5;
       this.scene.add(leftBullet);
       this.wingBullets.push(leftBullet);
     }
     
     // Shoot from right wing
-    if (this.rightWing && !this.rightWing.userData.isDestroyed && this.rightWing.userData.gun) {
+    if (this.rightWing && !this.rightWing.userData.isDestroyed) {
       const rightBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
       const rightWingWorldPos = new THREE.Vector3();
       this.rightWing.getWorldPosition(rightWingWorldPos);
       rightBullet.position.copy(rightWingWorldPos);
-      
-      // Calculate bullet direction based on actual gun orientation
-      const gun = this.rightWing.userData.gun;
-      const bulletDirection = new THREE.Vector3(0, 0, 1); // Default direction toward camera
-      bulletDirection.applyQuaternion(gun.quaternion); // Apply gun's actual rotation
-      
-      // Remove Y component to keep bullets flat in 3D space
-      bulletDirection.y = 0;
-      
-      // Ensure bullets always move toward camera (positive Z)
-      if (bulletDirection.z < 0) {
-        bulletDirection.z = -bulletDirection.z;
-      }
-      
-      bulletDirection.normalize(); // Re-normalize after adjustments
-      
-      // Store direction in bullet for movement
-      rightBullet.userData = { direction: bulletDirection };
-      
+      rightBullet.position.y += 0.5;
       this.scene.add(rightBullet);
       this.wingBullets.push(rightBullet);
     }
@@ -303,26 +246,7 @@ export class Player {
   destroyWing(wing) {
     if (wing) {
       wing.userData.isDestroyed = true;
-      
-      // Remove the grey gun
-      if (wing.userData.gun) {
-        wing.remove(wing.userData.gun);
-        wing.userData.gun = null;
-      }
-      
-      // Replace the wing body with a "broken" version
-      const wingBody = wing.children[0]; // The wing body is the first child
-      if (wingBody) {
-        // Change the material to look broken (darker, more damaged)
-        wingBody.material.color.setHex(0x004444); // Darker blue-green
-        wingBody.material.emissive.setHex(0x001111); // Dim glow
-        
-        // Scale down to look damaged
-        wingBody.scale.set(0.7, 0.7, 0.7);
-        
-        // Add some rotation to look broken
-        wingBody.rotation.z = (Math.random() - 0.5) * 0.5; // Slight random rotation
-      }
+      this.scene.remove(wing);
     }
   }
 
@@ -404,30 +328,6 @@ export class Player {
         child.material.opacity = opacity;
       }
     });
-  }
-
-  updateGunRotation(inputManager) {
-    // Determine target rotation based on input (guns aim in same direction as movement)
-    if (inputManager.isRightPressed()) {
-      this.targetGunRotation = Math.PI / 4; // 45 degrees right (guns aim right when moving right)
-    } else if (inputManager.isLeftPressed()) {
-      this.targetGunRotation = -Math.PI / 4; // 45 degrees left (guns aim left when moving left)
-    } else {
-      this.targetGunRotation = 0; // Center position
-    }
-
-    // Smoothly interpolate to target rotation
-    this.currentGunRotation += (this.targetGunRotation - this.currentGunRotation) * this.gunRotationSpeed;
-
-
-
-    // Apply rotation to wing guns (use Y-axis rotation for left/right aiming)
-    if (this.leftWing && !this.leftWing.userData.isDestroyed && this.leftWing.userData.gun) {
-      this.leftWing.userData.gun.rotation.y = this.currentGunRotation;
-    }
-    if (this.rightWing && !this.rightWing.userData.isDestroyed && this.rightWing.userData.gun) {
-      this.rightWing.userData.gun.rotation.y = this.currentGunRotation;
-    }
   }
 
   destroy() {
