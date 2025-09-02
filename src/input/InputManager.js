@@ -43,14 +43,15 @@ export class InputManager {
   }
 
   attachTouchEvents(canvas) {
+    // Attach touch events to document so they work across the entire screen
+    // This allows touch controls to work in pillarboxing areas too
 
     // Touch start
-    canvas.addEventListener('touchstart', (e) => {
+    document.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const halfWidth = rect.width / 2;
+      const x = touch.clientX;
+      const halfWidth = window.innerWidth / 2;
       
       if (x < halfWidth) {
         this.touchState.left = true;
@@ -60,26 +61,25 @@ export class InputManager {
     });
 
     // Touch end
-    canvas.addEventListener('touchend', (e) => {
+    document.addEventListener('touchend', (e) => {
       e.preventDefault();
       this.touchState.left = false;
       this.touchState.right = false;
     });
 
     // Touch cancel (when touch is interrupted)
-    canvas.addEventListener('touchcancel', (e) => {
+    document.addEventListener('touchcancel', (e) => {
       e.preventDefault();
       this.touchState.left = false;
       this.touchState.right = false;
     });
 
-    // Mouse events for testing on desktop
+    // Mouse events for testing on desktop (still use canvas for mouse)
     canvas.addEventListener('mousedown', (e) => {
       if (this.isMobile) {
         e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const halfWidth = rect.width / 2;
+        const x = e.clientX;
+        const halfWidth = window.innerWidth / 2;
         
         if (x < halfWidth) {
           this.touchState.left = true;

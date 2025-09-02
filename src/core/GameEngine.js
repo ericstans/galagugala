@@ -27,22 +27,25 @@ export class GameEngine {
                      (navigator.maxTouchPoints > 0);
     
     if (isMobile) {
-      // On mobile, use full screen height and calculate width from aspect ratio
-      this.height = windowHeight;
-      this.width = this.height * (3 / 4); // 3:4 aspect ratio
+      // On mobile, scale to fit screen while maintaining 3:4 aspect ratio
+      const targetAspectRatio = 3 / 4;
+      const screenAspectRatio = windowWidth / windowHeight;
       
-      // Ensure minimum width
-      const minWidth = 240;
-      if (this.width < minWidth) {
-        this.width = minWidth;
-        this.height = this.width / (3 / 4);
+      if (screenAspectRatio > targetAspectRatio) {
+        // Screen is wider than target ratio - constrain by height, add side bars
+        this.height = windowHeight;
+        this.width = this.height * targetAspectRatio;
+      } else {
+        // Screen is taller than target ratio - constrain by width, add top/bottom bars
+        this.width = windowWidth;
+        this.height = this.width / targetAspectRatio;
       }
       
       this.aspectRatio = this.width / this.height;
       
-      // Center horizontally on mobile
+      // Center the canvas (black bars will appear automatically)
       this.offsetX = (windowWidth - this.width) / 2;
-      this.offsetY = 0; // Use full height
+      this.offsetY = (windowHeight - this.height) / 2;
     } else {
       // Desktop behavior - maintain aspect ratio with constraints
       const minWidth = 240;

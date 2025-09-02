@@ -34,7 +34,7 @@ export const GAME_CONFIG = {
   FORMATION_OFFSET: 1.5,
   
   // Audio settings
-  MASTER_VOLUME: 0.3,
+  MASTER_VOLUME: 0.6,
   
   // Explosion settings
   EXPLOSION_DURATION: 60, // frames
