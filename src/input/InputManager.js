@@ -1,6 +1,7 @@
 export class InputManager {
   constructor() {
     this.keys = {};
+    this.previousKeys = {}; // Track previous frame's key states
     this.isMobile = this.detectMobile();
     this.touchState = {
       left: false,
@@ -102,6 +103,16 @@ export class InputManager {
     return !!this.keys[key];
   }
 
+  isKeyPressed(key) {
+    // Returns true only on the frame when key transitions from not pressed to pressed
+    return !!this.keys[key] && !this.previousKeys[key];
+  }
+
+  update() {
+    // Update previous keys state for next frame
+    this.previousKeys = { ...this.keys };
+  }
+
   isLeftPressed() {
     if (this.isMobile) {
       return this.touchState.left;
@@ -132,7 +143,7 @@ export class InputManager {
   }
 
   isInvulnerabilityTogglePressed() {
-    return this.isPressed('KeyI');
+    return this.isKeyPressed('KeyI');
   }
 
   isEnterPressed() {

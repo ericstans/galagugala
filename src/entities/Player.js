@@ -38,6 +38,10 @@ export class Player {
     this.invulnerabilityFlashTimer = 0;
     this.originalMaterials = new Map(); // Store original materials for restoration
     
+    // Shield system
+    this.hasShield = false;
+    this.shieldBubble = null;
+    
     if (DEBUG) console.log('Player created - no wings initially');
   }
 
@@ -859,5 +863,47 @@ export class Player {
     }
     
     console.log('Player reset complete');
+  }
+
+  activateShield() {
+    // Only activate shield if player doesn't already have one
+    if (this.hasShield) {
+      return;
+    }
+
+    this.hasShield = true;
+    
+    // Create shield bubble
+    const shieldGeometry = new THREE.SphereGeometry(1.2, 16, 12);
+    const shieldMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff, // Cyan color
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.BackSide // Render inside of sphere
+    });
+    
+    this.shieldBubble = new THREE.Mesh(shieldGeometry, shieldMaterial);
+    this.shieldBubble.position.set(0, 0, 0); // Position relative to ship (center)
+    this.mesh.add(this.shieldBubble);
+    
+    console.log('Shield activated!');
+  }
+
+  deactivateShield() {
+    if (!this.hasShield || !this.shieldBubble) {
+      return;
+    }
+
+    this.hasShield = false;
+    
+    // Remove shield bubble from scene
+    this.mesh.remove(this.shieldBubble);
+    this.shieldBubble = null;
+    
+    console.log('Shield deactivated!');
+  }
+
+  hasActiveShield() {
+    return this.hasShield;
   }
 }

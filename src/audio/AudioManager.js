@@ -350,22 +350,22 @@ export class AudioManager {
     filter.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
     
-    // Rising frequency for charge effect - starts 1 second later, lasts 1 second
-    oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime + 1.0);
-    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 2.0);
+    // Rising frequency for charge effect - starts immediately, lasts 1 second
+    oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 1.0);
     
     // Low-pass filter that opens up during charge
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(400, this.audioContext.currentTime + 1.0);
-    filter.frequency.exponentialRampToValueAtTime(1200, this.audioContext.currentTime + 2.0);
+    filter.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(1200, this.audioContext.currentTime + 1.0);
     
     // Building volume with slight tremolo effect
-    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 1.0);
-    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.2, this.audioContext.currentTime + 1.1);
-    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.4, this.audioContext.currentTime + 2.0);
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.1, this.audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.2, this.audioContext.currentTime + 1.0);
     
-    oscillator.start(this.audioContext.currentTime + 1.0);
-    oscillator.stop(this.audioContext.currentTime + 2.0);
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 1.0);
     
     return oscillator;
   }

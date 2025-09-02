@@ -184,23 +184,33 @@ export class EnemyManager {
     // 2. Occasionally, one enemy dives toward the player in a curve (after 3 second delay)
     // 3. If it misses, it returns to formation
     if (this.diveCooldown > 0) this.diveCooldown--;
-    else if (!divingDisabled && this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed && Math.random() < 0.02) {
-      const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation' && !e.userData.warningActive);
-      if (formationEnemies.length > 0) {
-        // Check for formation swooping (enemies close to each other)
-        const formationGroups = this.findFormationGroups(formationEnemies);
-        
-        if (formationGroups.length > 0 && Math.random() < 0.3) {
-          // Formation swoop - multiple enemies together
-          const group = formationGroups[Math.floor(Math.random() * formationGroups.length)];
-          this.initiateFormationSwoop(group, player, audioManager);
-        } else {
-          // Single enemy swoop with variety
-          const diver = formationEnemies[Math.floor(Math.random() * formationEnemies.length)];
-          this.initiateSwoop(diver, Math.random(), player, audioManager);
-        }
+    else if (!divingDisabled && this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed) {
+      // Calculate diving probability based on level
+      let diveProbability = 0;
+      if (this.currentLevel >= 3) {
+        // Scale from 0 to 0.02 over levels 3-20
+        const progress = Math.min((this.currentLevel - 3) / (20 - 3), 1);
+        diveProbability = 0.02 * progress;
       }
-      this.diveCooldown = 60 + Math.random() * 60;
+      
+      if (Math.random() < diveProbability) {
+        const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation' && !e.userData.warningActive);
+        if (formationEnemies.length > 0) {
+          // Check for formation swooping (enemies close to each other)
+          const formationGroups = this.findFormationGroups(formationEnemies);
+          
+          if (formationGroups.length > 0 && Math.random() < 0.3) {
+            // Formation swoop - multiple enemies together
+            const group = formationGroups[Math.floor(Math.random() * formationGroups.length)];
+            this.initiateFormationSwoop(group, player, audioManager);
+          } else {
+            // Single enemy swoop with variety
+            const diver = formationEnemies[Math.floor(Math.random() * formationEnemies.length)];
+            this.initiateSwoop(diver, Math.random(), player, audioManager);
+          }
+        }
+        this.diveCooldown = 60 + Math.random() * 60;
+      }
     }
 
     // Enemy bullet system (level 10+)
@@ -208,7 +218,16 @@ export class EnemyManager {
       if (this.bulletCooldown > 0) this.bulletCooldown--;
       else if (this.enemies.length > 0 && gameState.isPlaying && !gameState.playerDestroyed) {
         // Different bullet types based on level
-        const shootChance = this.currentLevel >= 20 ? 0.01 : 0.005; // Red bullets are rarer
+        let shootChance = this.currentLevel >= 20 ? 0.005 : 0.005; // Red bullets are now half as frequent
+        
+        // Apply level-based frequency multipliers for red bullets (level 35+)
+        if (this.currentLevel >= 20) {
+          if (this.currentLevel >= 35) {
+            const multiplierLevels = Math.floor((this.currentLevel - 35) / 10);
+            const frequencyMultiplier = 1.5 + (multiplierLevels * 0.5);
+            shootChance *= frequencyMultiplier;
+          }
+        }
         if (Math.random() < shootChance) {
           // Find formation enemies that can shoot
           const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation' && !e.userData.warningActive);
@@ -511,7 +530,7 @@ export class EnemyManager {
       // Red bullets (level 20+) - thick cylinders with high spread
       bulletGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.5, 8);
       bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff6666 });
-      bulletSpeed = 0.15;
+      bulletSpeed = 0.10;
       spreadAmount = Math.PI / 3; // ±30 degrees
     } else {
       // Green bullets (level 10-19) - large circles, easier to dodge
@@ -542,6 +561,25 @@ export class EnemyManager {
     const verticalSpread = (Math.random() - 0.5) * verticalSpreadAmount;
     direction.y += verticalSpread;
     direction.normalize();
+    
+    // For red bullets, constrain to max 30 degrees from straight down
+    if (this.currentLevel >= 20) {
+      const straightDown = new THREE.Vector3(0, -1, 0);
+      const angleFromDown = direction.angleTo(straightDown);
+      const maxAngle = Math.PI / 6; // 30 degrees in radians
+      
+      if (angleFromDown > maxAngle) {
+        // Clamp the direction to max 30 degrees from straight down
+        const axis = new THREE.Vector3().crossVectors(straightDown, direction).normalize();
+        if (axis.length() > 0) {
+          direction.copy(straightDown);
+          direction.applyAxisAngle(axis, maxAngle);
+        } else {
+          // If vectors are parallel, just use straight down
+          direction.copy(straightDown);
+        }
+      }
+    }
     
     // Store bullet data
     bullet.userData = {

@@ -257,6 +257,9 @@ class Game {
       return; // Don't update other game logic during respawn delay
     }
     
+    // Update input manager (for key press detection)
+    this.input.update();
+    
     // Update player
     const playerResult = this.player.update(this.input, gameState, this.engine);
     if (playerResult && playerResult.manualPowerUp) {
@@ -372,31 +375,47 @@ class Game {
       );
       
       if (enemyBulletCollision && !this.player.isInvulnerable) {
-        // Mark player as destroyed
-        this.engine.setGameState({
-          playerDestroyed: true,
-          isPlaying: false
-        });
-        
-        // Create explosion at player position
-        this.effects.createExplosion(this.player.position);
-        
-        // Remove player ship
-        this.player.destroy();
-        
-        // Remove the bullet that hit and clean up its trail
-        const hitBullet = enemyBulletCollision.bullet;
-        if (hitBullet.userData.isGreen) {
-          this.enemies.cleanupBulletTrail(hitBullet);
+        // Check if player has shield
+        if (this.player.hasActiveShield()) {
+          // Shield absorbs the hit
+          this.player.deactivateShield();
+          
+          // Remove the bullet that hit and clean up its trail
+          const hitBullet = enemyBulletCollision.bullet;
+          if (hitBullet.userData.isGreen) {
+            this.enemies.cleanupBulletTrail(hitBullet);
+          }
+          this.engine.scene.remove(hitBullet);
+          this.enemies.enemyBullets.splice(enemyBulletCollision.bulletIndex, 1);
+          
+          console.log('Shield absorbed enemy bullet!');
+        } else {
+          // No shield - player is destroyed
+          this.engine.setGameState({
+            playerDestroyed: true,
+            isPlaying: false
+          });
+          
+          // Create explosion at player position
+          this.effects.createExplosion(this.player.position);
+          
+          // Remove player ship
+          this.player.destroy();
+          
+          // Remove the bullet that hit and clean up its trail
+          const hitBullet = enemyBulletCollision.bullet;
+          if (hitBullet.userData.isGreen) {
+            this.enemies.cleanupBulletTrail(hitBullet);
+          }
+          this.engine.scene.remove(hitBullet);
+          this.enemies.enemyBullets.splice(enemyBulletCollision.bulletIndex, 1);
+          
+          // Play explosion sound
+          this.audio.playExplosion();
+          
+          // Announce ship destruction
+          this.audio.createRobotSpeech("Ship Destroyed");
         }
-        this.engine.scene.remove(hitBullet);
-        this.enemies.enemyBullets.splice(enemyBulletCollision.bulletIndex, 1);
-        
-        // Play explosion sound
-        this.audio.playExplosion();
-        
-        // Announce ship destruction
-        this.audio.createRobotSpeech("Ship Destroyed");
       }
     }
 
@@ -412,6 +431,11 @@ class Game {
         // Handle chain updates and score bonus for blue power-ups
         if (powerUpResult.type === 'blue' && powerUpResult.chainCount !== undefined) {
           this.overlay.updateChain(powerUpResult.chainCount);
+          
+          // Check for 10-chain shield activation
+          if (powerUpResult.chainCount === 10) {
+            this.player.activateShield();
+          }
           
           // Add score bonus: 10^CHAIN
           if (powerUpResult.scoreBonus !== undefined) {
@@ -484,23 +508,36 @@ class Game {
       );
       
       if (enemyCollision && !gameState.playerDestroyed) {
-        // Mark player as destroyed
-        this.engine.setGameState({
-          playerDestroyed: true,
-          isPlaying: false
-        });
-        
-        // Create explosion at player position
-        this.effects.createExplosion(this.player.position);
-        
-        // Remove player ship (cockpit and wings are automatically removed as they're children)
-        this.player.destroy();
-        
-        // Play explosion sound
-        this.audio.playExplosion();
-        
-        // Announce ship destruction
-        this.audio.createRobotSpeech("Ship Destroyed");
+        // Check if player has shield
+        if (this.player.hasActiveShield()) {
+          // Shield absorbs the hit
+          this.player.deactivateShield();
+          
+          // Remove the enemy that hit
+          this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          });
+          
+          console.log('Shield absorbed enemy collision!');
+        } else {
+          // No shield - player is destroyed
+          this.engine.setGameState({
+            playerDestroyed: true,
+            isPlaying: false
+          });
+          
+          // Create explosion at player position
+          this.effects.createExplosion(this.player.position);
+          
+          // Remove player ship (cockpit and wings are automatically removed as they're children)
+          this.player.destroy();
+          
+          // Play explosion sound
+          this.audio.playExplosion();
+          
+          // Announce ship destruction
+          this.audio.createRobotSpeech("Ship Destroyed");
+        }
       }
     }
     
@@ -696,6 +733,9 @@ class Game {
     // Reset player position and state (remove wings on game restart)
     this.player.reset(true);
     
+    // Deactivate shield on game restart
+    this.player.deactivateShield();
+    
     // Show player ship
     this.player.show();
     
@@ -750,6 +790,9 @@ class Game {
     
     // Reset player position and state (remove wings on respawn)
     this.player.reset(true);
+    
+    // Deactivate shield on respawn
+    this.player.deactivateShield();
     
     // Show player ship
     this.player.show();
