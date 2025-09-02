@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
 export class EnemyManager {
-  constructor(scene, level = 1) {
+  constructor(scene, level = 1, gameEngine = null) {
     this.scene = scene;
     this.enemies = [];
     this.diveCooldown = 0;
@@ -16,10 +16,10 @@ export class EnemyManager {
     this.initialColumnStructure = {}; // Track initial column structure
     this.processedColumns = new Set(); // Track which columns have already spawned power-ups
     this.lastEnemyInColumn = {}; // Track the last enemy destroyed in each column
-    this.createEnemies(level);
+    this.createEnemies(level, gameEngine);
   }
 
-  createEnemies(level = 1) {
+  createEnemies(level = 1, gameEngine = null) {
     this.enemies = [];
     
     // Calculate level-based enemy formation size
@@ -35,20 +35,33 @@ export class EnemyManager {
     
     console.log(`Level ${level} calculation: baseRows=${baseRows}, baseCols=${baseCols}, additionalRows=${additionalRows}, additionalCols=${additionalCols}, totalRows=${totalRows}, totalCols=${totalCols}`);
     
+    // Get dynamic bounds from game engine if available
+    let bounds;
+    if (gameEngine) {
+      bounds = gameEngine.getVisibleBounds();
+    } else {
+      // Fallback to hardcoded bounds if gameEngine not available
+      bounds = {
+        left: -6,
+        right: 6,
+        top: 7,
+        bottom: -7,
+        width: 12,
+        height: 14
+      };
+    }
+    
     // Calculate dynamic Y spacing to keep formation on screen
-    // Camera is at z=10 with 75° FOV, so visible height ≈ 14.6 units
-    const maxVisibleHeight = 14.6;
     const topMargin = 2.0; // Keep some margin from top
     const bottomMargin = 1.5; // Keep some margin from bottom
-    const availableHeight = maxVisibleHeight - topMargin - bottomMargin;
+    const availableHeight = bounds.height - topMargin - bottomMargin;
     
     // Calculate Y spacing to fit all rows within available height
     const dynamicYSpacing = totalRows > 1 ? availableHeight / (totalRows - 1) : GAME_CONFIG.ENEMY_Y_SPACING;
     const clampedYSpacing = Math.min(dynamicYSpacing, GAME_CONFIG.ENEMY_Y_SPACING); // Don't exceed original spacing
     
-    // Calculate dynamic X spacing to keep formation within player's reach
-    // Player can move from x = -6 to x = 6, so max formation width should be ≤ 12 units
-    const maxFormationWidth = 12.0; // Match player's movement range
+    // Calculate dynamic X spacing to keep formation within visible bounds
+    const maxFormationWidth = bounds.width * 0.8; // Use 80% of visible width
     const dynamicXSpacing = totalCols > 1 ? maxFormationWidth / (totalCols - 1) : GAME_CONFIG.ENEMY_X_SPACING;
     const clampedXSpacing = Math.min(dynamicXSpacing, GAME_CONFIG.ENEMY_X_SPACING); // Don't exceed original spacing
     
@@ -87,8 +100,9 @@ export class EnemyManager {
         const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
         enemy.add(edges);
         
-        const formationX = (col - totalCols / 2 + 0.5) * clampedXSpacing;
-        const formationY = row * clampedYSpacing + bottomMargin;
+        // Center the formation within the visible bounds
+        const formationX = (col - (totalCols - 1) / 2) * clampedXSpacing;
+        const formationY = bounds.top - topMargin - (row * clampedYSpacing);
         enemy.position.set(formationX, formationY, 0);
         enemy.userData = {
           formationX,

@@ -13,6 +13,12 @@ export class OverlayManager {
     this.setupEventListeners();
   }
 
+  isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           ('ontouchstart' in window) ||
+           (navigator.maxTouchPoints > 0);
+  }
+
   createOverlay() {
     let overlay = document.getElementById('game-overlay');
     if (!overlay) {
@@ -147,11 +153,19 @@ export class OverlayManager {
       startOverlay.style.textAlign = 'center';
       startOverlay.style.cursor = 'pointer';
       startOverlay.style.userSelect = 'none';
-      startOverlay.innerHTML = `
-        <div style="font-size:2rem;opacity:0.8;margin-top:16rem;">WASD / arrows to move</div>
-        <div style="font-size:2rem;opacity:0.8;">Z / SPACE to shoot</div>
-        <div style="font-size:2rem;margin-bottom:1rem;">Enter to Start</div>
-      `;
+      // Show mobile or desktop instructions
+      if (this.isMobile()) {
+        startOverlay.innerHTML = `
+          <div style="font-size:2rem;opacity:0.8;margin-top:16rem;">Tap left and right to move</div>
+          <div style="font-size:2rem;margin-bottom:1rem;">Tap to start</div>
+        `;
+      } else {
+        startOverlay.innerHTML = `
+          <div style="font-size:2rem;opacity:0.8;margin-top:16rem;">WASD / arrows to move</div>
+          <div style="font-size:2rem;opacity:0.8;">Z / SPACE to shoot</div>
+          <div style="font-size:2rem;margin-bottom:1rem;">Enter to Start</div>
+        `;
+      }
       document.body.appendChild(startOverlay);
     }
     return startOverlay;
@@ -420,8 +434,13 @@ export class OverlayManager {
     const vector = worldPosition.clone();
     vector.project(camera);
     
-    const x = (vector.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
-    const y = (vector.y * -0.5 + 0.5) * renderer.domElement.clientHeight;
+    // Get canvas position and size
+    const canvas = renderer.domElement;
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Calculate position relative to canvas, then add canvas offset
+    const x = (vector.x * 0.5 + 0.5) * canvas.clientWidth + canvasRect.left;
+    const y = (vector.y * -0.5 + 0.5) * canvas.clientHeight + canvasRect.top;
     
     // Create popup element
     const popup = document.createElement('div');

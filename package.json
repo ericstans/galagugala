@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "start": "npx vite",
+    "start": "npx vite --host",
     "build": "npx vite build",
     "preview": "npx vite preview"
   },

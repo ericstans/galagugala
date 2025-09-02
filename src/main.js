@@ -28,8 +28,7 @@ class Game {
     // Score tracking
     this.score = 0;
     
-    this.enemies = new EnemyManager(this.engine.scene, this.currentLevel);
-    console.log(`EnemyManager created with level ${this.currentLevel}`);
+    this.enemies = null; // Will be created after engine initialization
     this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
     
@@ -82,6 +81,11 @@ class Game {
   
   init() {
     this.engine.init();
+    
+    // Create enemies after engine is initialized so bounds calculation works
+    this.enemies = new EnemyManager(this.engine.scene, this.currentLevel, this.engine);
+    console.log(`EnemyManager created with level ${this.currentLevel}`);
+    
     this.setupAudioStart();
     this.setupGameStart();
     
@@ -104,7 +108,9 @@ class Game {
     const render = () => {
       if (!this.gameStarted) {
         // Animate enemies with waving effect during intro
-        this.enemies.updateIntroAnimation();
+        if (this.enemies) {
+          this.enemies.updateIntroAnimation();
+        }
         this.engine.render();
         this.introRenderId = requestAnimationFrame(render);
       }
@@ -204,7 +210,7 @@ class Game {
     const gameState = this.engine.getGameState();
     
     // Update player
-    const playerResult = this.player.update(this.input, gameState);
+    const playerResult = this.player.update(this.input, gameState, this.engine);
     if (playerResult && playerResult.manualPowerUp) {
       this.powerUps.createPowerUp();
     }
@@ -213,7 +219,9 @@ class Game {
     }
     
     // Update enemies
-    this.enemies.update(this.player, gameState, this.audio);
+    if (this.enemies) {
+      this.enemies.update(this.player, gameState, this.audio);
+    }
     
     // Update power-ups
     this.powerUps.update(gameState, this.player, this.enemies, this.audio);
@@ -247,11 +255,11 @@ class Game {
     const gameState = this.engine.getGameState();
     
     // Main bullet-enemy collision
-    const bulletCollision = CollisionManager.checkBulletEnemyCollision(
+    const bulletCollision = this.enemies ? CollisionManager.checkBulletEnemyCollision(
       this.player.bullets, 
       this.enemies.enemies, 
       this.audio
-    );
+    ) : null;
     
     if (bulletCollision) {
       const { bulletIndex, enemyIndex, bullet, enemy } = bulletCollision;
@@ -278,11 +286,11 @@ class Game {
     }
     
     // Wing bullet-enemy collision
-    const wingBulletCollision = CollisionManager.checkWingBulletEnemyCollision(
+    const wingBulletCollision = this.enemies ? CollisionManager.checkWingBulletEnemyCollision(
       this.player.wingBullets,
       this.enemies.enemies,
       this.audio
-    );
+    ) : null;
     
     if (wingBulletCollision) {
       const { bulletIndex, enemyIndex, bullet, enemy } = wingBulletCollision;
@@ -333,7 +341,7 @@ class Game {
     const gameState = this.engine.getGameState();
     
     // Check wing-enemy collisions first (only if not invulnerable)
-    if (!this.player.isInvulnerable) {
+    if (!this.player.isInvulnerable && this.enemies) {
       const wingCollision = CollisionManager.checkWingEnemyCollision(
         this.player,
         this.enemies.enemies
@@ -371,7 +379,7 @@ class Game {
     }
     
     // Game over (enemy reaches player) - only if not invulnerable
-    if (!this.player.isInvulnerable) {
+    if (!this.player.isInvulnerable && this.enemies) {
       const enemyCollision = CollisionManager.checkPlayerEnemyCollision(
         this.player, 
         this.enemies.enemies
@@ -427,7 +435,7 @@ class Game {
     }
 
     // Level complete condition (only if game is still playing)
-    if (this.enemies.enemies.length === 0 && gameState.isPlaying && !this.effects.levelCompleteAnimation) {
+    if (this.enemies && this.enemies.enemies.length === 0 && gameState.isPlaying && !this.effects.levelCompleteAnimation) {
       console.log('All enemies destroyed! Starting level complete animation...');
       this.effects.startLevelCompleteAnimation();
       this.overlay.showLevelComplete();
@@ -469,7 +477,7 @@ class Game {
     
     // Spawn new enemies for the next level with level-based scaling
     console.log(`Creating enemies for level ${this.currentLevel}...`);
-    this.enemies.createEnemies(this.currentLevel);
+    this.enemies.createEnemies(this.currentLevel, this.engine);
     
     // Update soundtrack for new level
     this.audio.updateSoundtrack(this.currentLevel);
@@ -518,7 +526,7 @@ class Game {
     this.overlay.showScore(); // Show score for restart
     
     // Spawn new enemies for the restart level
-    this.enemies.createEnemies(this.currentLevel);
+    this.enemies.createEnemies(this.currentLevel, this.engine);
     
     // Start soundtrack for the restart level
     this.audio.updateSoundtrack(this.currentLevel);

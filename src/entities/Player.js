@@ -430,20 +430,26 @@ export class Player {
     return null;
   }
 
-  update(inputManager, gameState) {
+  update(inputManager, gameState, gameEngine) {
     let velocityX = 0;
+    
+    // Get dynamic bounds from game engine
+    const bounds = gameEngine.getVisibleBounds();
+    const playerMargin = 0.5; // Keep player slightly away from screen edges
+    const leftBound = bounds.left + playerMargin;
+    const rightBound = bounds.right - playerMargin;
     
     // Player movement (only if not destroyed)
     if (gameState.isPlaying && !gameState.playerDestroyed) {
       if (inputManager.isLeftPressed()) {
         this.mesh.position.x -= GAME_CONFIG.PLAYER_SPEED;
         velocityX = -GAME_CONFIG.PLAYER_SPEED;
-        if (this.mesh.position.x < -6) this.mesh.position.x = -6;
+        if (this.mesh.position.x < leftBound) this.mesh.position.x = leftBound;
       }
       if (inputManager.isRightPressed()) {
         this.mesh.position.x += GAME_CONFIG.PLAYER_SPEED;
         velocityX = GAME_CONFIG.PLAYER_SPEED;
-        if (this.mesh.position.x > 6) this.mesh.position.x = 6;
+        if (this.mesh.position.x > rightBound) this.mesh.position.x = rightBound;
       }
       if (inputManager.isShootPressed()) {
         this.shoot();
