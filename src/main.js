@@ -36,6 +36,12 @@ class Game {
     this.audioStarted = false;
     this.gameStarted = false;
     this.introRenderId = null;
+    
+    // Mobile detection
+    this.isMobile = this.input.getIsMobile();
+    if (this.isMobile) {
+      console.log('Mobile device detected - enabling touch controls and auto-shoot');
+    }
   }
 
   getLevelFromURL() {
@@ -180,6 +186,15 @@ class Game {
       e.preventDefault();
     };
     document.addEventListener('keydown', startOnKey, { once: true });
+    
+    // Mobile: start on touch
+    if (this.isMobile) {
+      const startOnTouch = (e) => {
+        startGame();
+        e.preventDefault();
+      };
+      this.overlay.startOverlay.addEventListener('touchstart', startOnTouch, { once: true });
+    }
   }
   
   update() {
