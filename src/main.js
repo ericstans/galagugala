@@ -776,8 +776,8 @@ class Game {
     // Clear all effects
     this.effects.clearAll();
     
-    // Reset player position and state
-    this.player.reset();
+    // Reset player position and state (preserve invulnerability)
+    this.player.reset(false, false);
     
     // Clear all enemies and power-ups
     this.enemies.clearAll();

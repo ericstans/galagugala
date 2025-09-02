@@ -295,27 +295,30 @@ export class EnemyManager {
         enemy.userData.moveTime += 0.01; // Increment time (half the frequency)
         enemy.position.x = Math.sin(enemy.userData.moveTime) * enemy.userData.moveRange;
         
-        // Handle boss firing (twice per second, with increased yellow bullet frequency when damaged)
+        // Handle boss firing (with increased fire rate and yellow bullet frequency when damaged)
         if (enemy.userData.fireCooldown > 0) {
           enemy.userData.fireCooldown--;
         } else {
           // Fire bullet and cycle to next type
           this.shootBossBullet(enemy, player);
           
-          // Calculate health percentage for yellow bullet frequency multiplier
+          // Calculate health percentage for fire rate and yellow bullet frequency multiplier
           const healthPercent = enemy.userData.health / enemy.userData.maxHealth;
+          let fireRateMultiplier = 1.0;
           let yellowMultiplier = 1.0;
           
           if (healthPercent <= 0.4) {
-            // Orange or worse - 1.5x yellow bullet frequency
+            // Orange or worse - 1.5x yellow bullet frequency and 1.5x fire rate
             yellowMultiplier = 1.5;
+            fireRateMultiplier = 1.5;
           }
           if (healthPercent <= 0.1) {
-            // Light orange (almost dead) - 2x yellow bullet frequency
+            // Light orange (almost dead) - 2x yellow bullet frequency and 4x fire rate
             yellowMultiplier = 2.0;
+            fireRateMultiplier = 4.0;
           }
           
-          // Cycle to next bullet type, but skip ahead for yellow bullets when damaged
+          // Cycle to next bullet type, but favor yellow bullets when damaged
           let nextBulletType = (enemy.userData.currentBulletType + 1) % enemy.userData.bulletTypes.length;
           
           // If we're cycling to yellow and the boss is damaged, potentially fire yellow again
@@ -328,7 +331,7 @@ export class EnemyManager {
           }
           
           enemy.userData.currentBulletType = nextBulletType;
-          enemy.userData.fireCooldown = 30; // 30 frames = 0.5 seconds at 60fps
+          enemy.userData.fireCooldown = Math.floor(30 / fireRateMultiplier); // Faster firing when damaged
         }
         
         return; // Skip normal enemy processing for boss

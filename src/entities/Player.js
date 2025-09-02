@@ -812,7 +812,7 @@ export class Player {
     });
   }
 
-  reset(removeWings = false) {
+  reset(removeWings = false, resetInvulnerability = true) {
     console.log('Resetting player...');
     
     // Re-add ship to scene if it's not already there
@@ -828,10 +828,12 @@ export class Player {
     this.canShoot = true;
     this.canShootWings = true;
     
-    // Reset invulnerability
-    this.isInvulnerable = false;
-    this.invulnerabilityFlashTimer = 0;
-    this.originalMaterials.clear();
+    // Reset invulnerability only if requested
+    if (resetInvulnerability) {
+      this.isInvulnerable = false;
+      this.invulnerabilityFlashTimer = 0;
+      this.originalMaterials.clear();
+    }
     
     // Remove wings only if explicitly requested (game restart)
     if (removeWings) {

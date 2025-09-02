@@ -8,6 +8,7 @@ export class InputManager {
       right: false
     };
     this.autoShoot = this.isMobile; // Auto-shoot on mobile
+    this.iKeyWasPressed = false; // Track I key state for debounce
     this.setupEventListeners();
   }
 
@@ -143,7 +144,14 @@ export class InputManager {
   }
 
   isInvulnerabilityTogglePressed() {
-    return this.isKeyPressed('KeyI');
+    // Use isPressed but with debounce to prevent multiple toggles
+    if (this.isPressed('KeyI') && !this.iKeyWasPressed) {
+      this.iKeyWasPressed = true;
+      return true;
+    } else if (!this.isPressed('KeyI')) {
+      this.iKeyWasPressed = false;
+    }
+    return false;
   }
 
   isEnterPressed() {
