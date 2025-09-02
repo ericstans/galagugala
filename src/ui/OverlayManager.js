@@ -3,6 +3,7 @@ export class OverlayManager {
     this.overlay = this.createOverlay();
     this.chainDisplay = this.createChainDisplay();
     this.startOverlay = this.createStartOverlay();
+    this.scoreDisplay = this.createScoreDisplay();
     this.chainFadeTimeout = null; // Track fade-out timeout
     this.lastChainCount = 0; // Track previous chain count to detect breaks
     this.setupEventListeners();
@@ -67,6 +68,35 @@ export class OverlayManager {
     return chainDisplay;
   }
 
+  createScoreDisplay() {
+    let scoreDisplay = document.getElementById('score-display');
+    if (!scoreDisplay) {
+      scoreDisplay = document.createElement('div');
+      scoreDisplay.id = 'score-display';
+      scoreDisplay.style.position = 'fixed';
+      scoreDisplay.style.top = '20px';
+      scoreDisplay.style.right = '20px';
+      scoreDisplay.style.fontSize = '2rem';
+      scoreDisplay.style.fontWeight = 'bold';
+      scoreDisplay.style.color = '#00fffc';
+      scoreDisplay.style.fontFamily = 'Courier New, monospace';
+      scoreDisplay.style.textAlign = 'right';
+      scoreDisplay.style.textShadow = '0 0 10px #00fffc, 0 0 20px #00fffc';
+      scoreDisplay.style.zIndex = '400'; // Above game but below other UI elements
+      scoreDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
+      scoreDisplay.style.userSelect = 'none';
+      scoreDisplay.style.display = 'none'; // Initially hidden
+      // Initialize with dimmed zeros
+      let html = '';
+      for (let i = 0; i < 10; i++) {
+        html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+      }
+      scoreDisplay.innerHTML = html;
+      document.body.appendChild(scoreDisplay);
+    }
+    return scoreDisplay;
+  }
+
   createStartOverlay() {
     let startOverlay = document.getElementById('start-overlay');
     if (!startOverlay) {
@@ -90,9 +120,10 @@ export class OverlayManager {
       startOverlay.style.cursor = 'pointer';
       startOverlay.style.userSelect = 'none';
       startOverlay.innerHTML = `
-        <div style="font-size:4rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 0 20px #00fffc;">GALAGUGALA</div>
-        <div style="font-size:2rem;margin-bottom:1rem;">Click to Start</div>
-        <div style="font-size:1rem;opacity:0.8;">Use WASD to move, SPACE to shoot</div>
+        <div style="font-size:4rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 0 60px #00fffc;">GALAGUGALA</div>
+        <div style="font-size:4rem;opacity:0.8;">WASD / arrows to move</div>
+        <div style="font-size:4rem;opacity:0.8;">Z / SPACE to shoot</div>
+        <div style="font-size:4rem;margin-bottom:1rem;">Enter to Start</div>
       `;
       document.body.appendChild(startOverlay);
     }
@@ -250,6 +281,60 @@ export class OverlayManager {
     
     // Update the last chain count for next comparison
     this.lastChainCount = chainCount;
+  }
+
+  // Silently hide chain display without showing "CHAIN BROKEN" text
+  silentHideChain() {
+    // Cancel any existing fade-out timeout
+    if (this.chainFadeTimeout) {
+      clearTimeout(this.chainFadeTimeout);
+      this.chainFadeTimeout = null;
+    }
+    
+    // Just hide the display immediately
+    this.chainDisplay.style.display = 'none';
+    
+    // Reset the last chain count to prevent false "CHAIN BROKEN" messages
+    this.lastChainCount = 0;
+  }
+
+  // Score display methods
+  showScore() {
+    this.scoreDisplay.style.display = 'block';
+  }
+
+  hideScore() {
+    this.scoreDisplay.style.display = 'none';
+  }
+
+  updateScore(score) {
+    const scoreStr = score.toString();
+    const paddedScore = scoreStr.padStart(10, '0');
+    
+    // Create HTML with dimmed leading zeros and bright score digits
+    let html = '';
+    const leadingZeros = paddedScore.length - scoreStr.length;
+    
+    // Add dimmed leading zeros
+    for (let i = 0; i < leadingZeros; i++) {
+      html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+    }
+    
+    // Add bright score digits
+    for (let i = 0; i < scoreStr.length; i++) {
+      html += '<span style="color: #00fffc; text-shadow: 0 0 10px #00fffc, 0 0 20px #00fffc;">' + scoreStr[i] + '</span>';
+    }
+    
+    this.scoreDisplay.innerHTML = html;
+  }
+
+  resetScore() {
+    // Show all zeros in dimmed color
+    let html = '';
+    for (let i = 0; i < 10; i++) {
+      html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+    }
+    this.scoreDisplay.innerHTML = html;
   }
 
   // Start overlay methods

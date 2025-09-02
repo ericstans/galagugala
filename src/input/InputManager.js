@@ -26,7 +26,7 @@ export class InputManager {
   }
 
   isShootPressed() {
-    return this.isPressed('Space');
+    return this.isPressed('Space') || this.isPressed('KeyZ');
   }
 
   isManualPowerUpPressed() {

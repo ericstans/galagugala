@@ -22,6 +22,9 @@ class Game {
     this.currentLevel = this.getLevelFromURL();
     console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
     
+    // Score tracking
+    this.score = 0;
+    
     this.enemies = new EnemyManager(this.engine.scene, this.currentLevel);
     console.log(`EnemyManager created with level ${this.currentLevel}`);
     this.powerUps = new PowerUpManager(this.engine.scene);
@@ -51,6 +54,20 @@ class Game {
     
     console.log(`No valid level parameter found, defaulting to level 1`);
     return 1; // Default to level 1
+  }
+
+  // Calculate score for enemy destruction: 10 + 10 * floor((LEVEL-1)*0.5 + CHAIN*0.5)
+  calculateEnemyScore(chainCount) {
+    const levelBonus = (this.currentLevel - 1) * 0.5;
+    const chainBonus = chainCount * 0.5;
+    const multiplier = Math.floor(levelBonus + chainBonus);
+    return 10 + 10 * multiplier;
+  }
+
+  // Add score and update display
+  addScore(points) {
+    this.score += points;
+    this.overlay.updateScore(this.score);
   }
   
   init() {
@@ -100,6 +117,9 @@ class Game {
         
         // Set keyboard focus to the game canvas
         this.engine.renderer.domElement.focus();
+        
+        // Show score display
+        this.overlay.showScore();
         
         this.gameStarted = true;
         console.log('Game started!');
@@ -177,6 +197,11 @@ class Game {
       this.engine.scene.remove(bullet);
       this.player.bullets.splice(bulletIndex, 1);
       
+      // Calculate and add score
+      const chainCount = this.powerUps.getChainCount();
+      const enemyScore = this.calculateEnemyScore(chainCount);
+      this.addScore(enemyScore);
+      
       // Remove enemy with power-up callback
       this.enemies.removeEnemy(enemy, (position) => {
         this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
@@ -199,6 +224,11 @@ class Game {
       // Remove bullet
       this.engine.scene.remove(bullet);
       this.player.wingBullets.splice(bulletIndex, 1);
+      
+      // Calculate and add score
+      const chainCount = this.powerUps.getChainCount();
+      const enemyScore = this.calculateEnemyScore(chainCount);
+      this.addScore(enemyScore);
       
       // Remove enemy with power-up callback
       this.enemies.removeEnemy(enemy, (position) => {
@@ -247,6 +277,11 @@ class Game {
         const wingWorldPos = new THREE.Vector3();
         wing.getWorldPosition(wingWorldPos);
         this.effects.createExplosion(wingWorldPos);
+        
+        // Calculate and add score
+        const chainCount = this.powerUps.getChainCount();
+        const enemyScore = this.calculateEnemyScore(chainCount);
+        this.addScore(enemyScore);
         
         // Remove enemy with power-up callback
         this.enemies.removeEnemy(enemy, (position) => {
@@ -381,8 +416,13 @@ class Game {
     this.enemies.clearAll();
     this.powerUps.clearAll();
     
-    // Hide chain display for restart
-    this.overlay.hideChain();
+    // Silently hide chain display for restart (no "CHAIN BROKEN" text)
+    this.overlay.silentHideChain();
+    
+    // Reset score
+    this.score = 0;
+    this.overlay.resetScore();
+    this.overlay.showScore(); // Show score for restart
     
     // Spawn new enemies for the restart level
     this.enemies.createEnemies(this.currentLevel);
