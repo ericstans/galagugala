@@ -302,6 +302,17 @@ export class OverlayManager {
       this.chainDisplay.textContent = chainCount === 10 ? 'MAX' : chainCount;
       this.chainDisplay.style.display = 'block';
       this.chainDisplay.style.opacity = '1'; // Ensure it's fully visible
+      
+      // Start fade-out after 3 seconds
+      this.chainFadeTimeout = setTimeout(() => {
+        this.chainDisplay.style.opacity = '0';
+        
+        // Hide the element after the fade animation completes
+        setTimeout(() => {
+          this.chainDisplay.style.display = 'none';
+          this.chainFadeTimeout = null;
+        }, 500); // Match the transition duration
+      }, 3000); // Fade out after 3 seconds
     }
   }
 

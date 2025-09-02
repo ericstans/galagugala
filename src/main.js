@@ -342,21 +342,52 @@ class Game {
       this.engine.scene.remove(bullet);
       this.player.bullets.splice(bulletIndex, 1);
       
-      // Calculate and add score
-      const chainCount = this.powerUps.getChainCount();
-      const enemyScore = this.calculateEnemyScore(chainCount);
-      this.addScore(enemyScore);
-      
-      // Show score popup at enemy position
-      this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
-      
-      // Remove enemy with power-up callback
-      this.enemies.removeEnemy(enemy, (position) => {
-        this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
-      });
-      
-      // Play hit sound
-      this.audio.playHit();
+      // Check if this is a boss
+      if (enemy.userData.isBoss) {
+        // Boss hit - reduce health instead of destroying
+        enemy.userData.health--;
+        
+        // Calculate and add score (smaller amount for boss hits)
+        const chainCount = this.powerUps.getChainCount();
+        const bossHitScore = 10; // Fixed score per hit
+        this.addScore(bossHitScore);
+        
+        // Show score popup at enemy position
+        this.overlay.createScorePopup(bossHitScore, enemy.position, this.engine.camera, this.engine.renderer);
+        
+        // Play hit sound
+        this.audio.playHit();
+        
+        // Check if boss is destroyed
+        if (enemy.userData.health <= 0) {
+          // Boss destroyed - give large bonus score
+          const bossDestroyScore = 1000;
+          this.addScore(bossDestroyScore);
+          this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
+          
+          // Remove boss
+          this.enemies.removeEnemy(enemy, (position) => {
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          });
+        }
+      } else {
+        // Normal enemy - destroy immediately
+        // Calculate and add score
+        const chainCount = this.powerUps.getChainCount();
+        const enemyScore = this.calculateEnemyScore(chainCount);
+        this.addScore(enemyScore);
+        
+        // Show score popup at enemy position
+        this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
+        
+        // Remove enemy with power-up callback
+        this.enemies.removeEnemy(enemy, (position) => {
+          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+        });
+        
+        // Play hit sound
+        this.audio.playHit();
+      }
     }
     
     // Wing bullet-enemy collision
@@ -373,21 +404,52 @@ class Game {
       this.engine.scene.remove(bullet);
       this.player.wingBullets.splice(bulletIndex, 1);
       
-      // Calculate and add score
-      const chainCount = this.powerUps.getChainCount();
-      const enemyScore = this.calculateEnemyScore(chainCount);
-      this.addScore(enemyScore);
-      
-      // Show score popup at enemy position
-      this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
-      
-      // Remove enemy with power-up callback
-      this.enemies.removeEnemy(enemy, (position) => {
-        this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
-      });
-      
-      // Play hit sound
-      this.audio.playHit();
+      // Check if this is a boss
+      if (enemy.userData.isBoss) {
+        // Boss hit - reduce health instead of destroying
+        enemy.userData.health--;
+        
+        // Calculate and add score (smaller amount for boss hits)
+        const chainCount = this.powerUps.getChainCount();
+        const bossHitScore = 10; // Fixed score per hit
+        this.addScore(bossHitScore);
+        
+        // Show score popup at enemy position
+        this.overlay.createScorePopup(bossHitScore, enemy.position, this.engine.camera, this.engine.renderer);
+        
+        // Play hit sound
+        this.audio.playHit();
+        
+        // Check if boss is destroyed
+        if (enemy.userData.health <= 0) {
+          // Boss destroyed - give large bonus score
+          const bossDestroyScore = 1000;
+          this.addScore(bossDestroyScore);
+          this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
+          
+          // Remove boss
+          this.enemies.removeEnemy(enemy, (position) => {
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          });
+        }
+      } else {
+        // Normal enemy - destroy immediately
+        // Calculate and add score
+        const chainCount = this.powerUps.getChainCount();
+        const enemyScore = this.calculateEnemyScore(chainCount);
+        this.addScore(enemyScore);
+        
+        // Show score popup at enemy position
+        this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
+        
+        // Remove enemy with power-up callback
+        this.enemies.removeEnemy(enemy, (position) => {
+          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+        });
+        
+        // Play hit sound
+        this.audio.playHit();
+      }
     }
     
     // Enemy bullet-player collision (level 10+)
@@ -497,18 +559,46 @@ class Game {
         wing.getWorldPosition(wingWorldPos);
         this.effects.createExplosion(wingWorldPos);
         
-        // Calculate and add score
-        const chainCount = this.powerUps.getChainCount();
-        const enemyScore = this.calculateEnemyScore(chainCount);
-        this.addScore(enemyScore);
-        
-        // Show score popup at enemy position
-        this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
-        
-        // Remove enemy with power-up callback
-        this.enemies.removeEnemy(enemy, (position) => {
-          this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
-        });
+        // Check if this is a boss
+        if (enemy.userData.isBoss) {
+          // Boss hit - reduce health instead of destroying
+          enemy.userData.health--;
+          
+          // Calculate and add score (smaller amount for boss hits)
+          const chainCount = this.powerUps.getChainCount();
+          const bossHitScore = 10; // Fixed score per hit
+          this.addScore(bossHitScore);
+          
+          // Show score popup at enemy position
+          this.overlay.createScorePopup(bossHitScore, enemy.position, this.engine.camera, this.engine.renderer);
+          
+          // Check if boss is destroyed
+          if (enemy.userData.health <= 0) {
+            // Boss destroyed - give large bonus score
+            const bossDestroyScore = 1000;
+            this.addScore(bossDestroyScore);
+            this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
+            
+            // Remove boss
+            this.enemies.removeEnemy(enemy, (position) => {
+              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+            });
+          }
+        } else {
+          // Normal enemy - destroy immediately
+          // Calculate and add score
+          const chainCount = this.powerUps.getChainCount();
+          const enemyScore = this.calculateEnemyScore(chainCount);
+          this.addScore(enemyScore);
+          
+          // Show score popup at enemy position
+          this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
+          
+          // Remove enemy with power-up callback
+          this.enemies.removeEnemy(enemy, (position) => {
+            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+          });
+        }
         
         // Destroy wing
         this.player.destroyWing(wing);
@@ -536,10 +626,29 @@ class Game {
           // Shield absorbs the hit
           this.player.deactivateShield();
           
-          // Remove the enemy that hit
-          this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
-            this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
-          });
+          // Check if this is a boss
+          if (enemyCollision.enemy.userData.isBoss) {
+            // Boss hit - reduce health instead of destroying
+            enemyCollision.enemy.userData.health--;
+            
+            // Check if boss is destroyed
+            if (enemyCollision.enemy.userData.health <= 0) {
+              // Boss destroyed - give large bonus score
+              const bossDestroyScore = 1000;
+              this.addScore(bossDestroyScore);
+              this.overlay.createScorePopup(bossDestroyScore, enemyCollision.enemy.position, this.engine.camera, this.engine.renderer);
+              
+              // Remove boss
+              this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
+                this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+              });
+            }
+          } else {
+            // Normal enemy - remove immediately
+            this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
+              this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
+            });
+          }
           
           console.log('Shield absorbed enemy collision!');
         } else {
@@ -682,6 +791,10 @@ class Game {
     if (this.currentLevel + 1 % 10 === 0) {
       if (DEBUG) console.log(`Level ${this.currentLevel} detected - starting plasma storm instead of spawning enemies`);
       this.startPlasmaStorm();
+    } else if (this.currentLevel === 50) {
+      // Level 50 boss
+      if (DEBUG) console.log(`Level 50 detected - spawning boss instead of enemies`);
+      this.enemies.createBoss(this.engine);
     } else {
       // Spawn new enemies for the next level with level-based scaling
       if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
@@ -815,6 +928,10 @@ class Game {
     if (this.currentLevel % 10 === 0) {
       if (DEBUG) console.log(`Level ${this.currentLevel} detected on restart - starting plasma storm instead of spawning enemies`);
       this.startPlasmaStorm();
+    } else if (this.currentLevel === 50) {
+      // Level 50 boss
+      if (DEBUG) console.log(`Level 50 detected on restart - spawning boss instead of enemies`);
+      this.enemies.createBoss(this.engine);
     } else {
       // Spawn new enemies for the restart level
       this.enemies.createEnemies(this.currentLevel, this.engine);

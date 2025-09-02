@@ -270,6 +270,70 @@ export class EnemyManager {
     this.updateEnemyWarnings();
 
     this.enemies.forEach(enemy => {
+      // Handle boss rotation and firing
+      if (enemy.userData.isBoss) {
+        // Rotate each cube in the boss group
+        enemy.children.forEach(cube => {
+          cube.rotation.x += cube.userData.rotationSpeed;
+          cube.rotation.y += cube.userData.rotationSpeed;
+          cube.rotation.z += cube.userData.rotationSpeed;
+          
+          // Update color based on health
+          const healthPercent = enemy.userData.health / enemy.userData.maxHealth;
+          if (healthPercent > 0.7) {
+            cube.material.color.setHex(0xff4444); // Red when healthy
+          } else if (healthPercent > 0.4) {
+            cube.material.color.setHex(0xff8844); // Orange when damaged
+          } else if (healthPercent > 0.1) {
+            cube.material.color.setHex(0xffaa44); // Yellow when heavily damaged
+          } else {
+            cube.material.color.setHex(0xffaa88); // Light orange when almost dead
+          }
+        });
+        
+        // Handle boss horizontal movement using sine wave
+        enemy.userData.moveTime += 0.01; // Increment time (half the frequency)
+        enemy.position.x = Math.sin(enemy.userData.moveTime) * enemy.userData.moveRange;
+        
+        // Handle boss firing (twice per second, with increased yellow bullet frequency when damaged)
+        if (enemy.userData.fireCooldown > 0) {
+          enemy.userData.fireCooldown--;
+        } else {
+          // Fire bullet and cycle to next type
+          this.shootBossBullet(enemy, player);
+          
+          // Calculate health percentage for yellow bullet frequency multiplier
+          const healthPercent = enemy.userData.health / enemy.userData.maxHealth;
+          let yellowMultiplier = 1.0;
+          
+          if (healthPercent <= 0.4) {
+            // Orange or worse - 1.5x yellow bullet frequency
+            yellowMultiplier = 1.5;
+          }
+          if (healthPercent <= 0.1) {
+            // Light orange (almost dead) - 2x yellow bullet frequency
+            yellowMultiplier = 2.0;
+          }
+          
+          // Cycle to next bullet type, but skip ahead for yellow bullets when damaged
+          let nextBulletType = (enemy.userData.currentBulletType + 1) % enemy.userData.bulletTypes.length;
+          
+          // If we're cycling to yellow and the boss is damaged, potentially fire yellow again
+          if (enemy.userData.bulletTypes[nextBulletType] === 'yellow' && yellowMultiplier > 1.0) {
+            // Random chance to fire yellow again based on multiplier
+            if (Math.random() < (yellowMultiplier - 1.0)) {
+              // Stay on yellow bullet type for another shot
+              nextBulletType = enemy.userData.currentBulletType;
+            }
+          }
+          
+          enemy.userData.currentBulletType = nextBulletType;
+          enemy.userData.fireCooldown = 30; // 30 frames = 0.5 seconds at 60fps
+        }
+        
+        return; // Skip normal enemy processing for boss
+      }
+      
       if (enemy.userData.state === 'formation') {
         // Small wiggle for life
         enemy.position.x = enemy.userData.formationX + Math.sin(Date.now() * 0.001 + enemy.userData.formationY) * 0.1;
@@ -1003,5 +1067,88 @@ export class EnemyManager {
     enemy.userData.blinkRate = undefined;
     enemy.userData.originalColor = undefined;
     enemy.userData.targetPlayer = undefined;
+  }
+
+  createBoss(gameEngine) {
+    if (DEBUG) console.log('Creating Level 50 Boss');
+    
+    // Clear any existing enemies
+    this.clearAll();
+    
+    // Create boss group
+    const bossGroup = new THREE.Group();
+    bossGroup.userData = {
+      type: 'boss',
+      health: 100, // Boss takes 100 hits to destroy
+      maxHealth: 100,
+      isBoss: true,
+      rotationSpeed: 0.02, // Same rotation speed for all cubes
+      fireCooldown: 0, // Boss firing cooldown (30 frames = 0.5 seconds at 60fps)
+      currentBulletType: 0, // Index for cycling through bullet types
+      bulletTypes: ['green', 'red', 'yellow'], // Available bullet types
+      moveSpeed: 2.0, // Horizontal movement speed
+      moveDirection: 1, // 1 for right, -1 for left
+      moveRange: 3, // How far left/right the boss moves from center
+      moveTime: 0 // Time counter for movement
+    };
+    
+    // Create 10 large overlapping cubes
+    for (let i = 0; i < 10; i++) {
+      const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5); // Large cubes
+      const material = new THREE.MeshBasicMaterial({ 
+        color: 0xff4444, // Red color
+        wireframe: true,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      const cube = new THREE.Mesh(geometry, material);
+      
+      // Random position within a small area (overlapping)
+      cube.position.x = (Math.random() - 0.5) * 2; // -1 to 1
+      cube.position.y = (Math.random() - 0.5) * 2; // -1 to 1
+      cube.position.z = (Math.random() - 0.5) * 2; // -1 to 1
+      
+      // Random rotation angles
+      cube.rotation.x = Math.random() * Math.PI * 2;
+      cube.rotation.y = Math.random() * Math.PI * 2;
+      cube.rotation.z = Math.random() * Math.PI * 2;
+      
+      // Store rotation speed
+      cube.userData.rotationSpeed = bossGroup.userData.rotationSpeed;
+      
+      // Store reference to boss for health updates
+      cube.userData.boss = bossGroup;
+      
+      bossGroup.add(cube);
+    }
+    
+    // Position boss in the center of the screen
+    const bounds = gameEngine.getVisibleBounds();
+    bossGroup.position.x = 0;
+    bossGroup.position.y = bounds.top - 2; // Near the top
+    bossGroup.position.z = 0;
+    
+    // Add to scene and enemies array
+    this.scene.add(bossGroup);
+    this.enemies.push(bossGroup);
+    
+    if (DEBUG) console.log('Boss created with 10 cubes');
+  }
+
+  shootBossBullet(boss, player) {
+    const bulletType = boss.userData.bulletTypes[boss.userData.currentBulletType];
+    if (DEBUG) console.log(`Boss firing ${bulletType} bullet`);
+    
+    // Create a temporary enemy object with the bullet type for the existing shootEnemyBullet method
+    const tempEnemy = {
+      position: boss.position.clone(),
+      userData: {
+        warningType: bulletType
+      }
+    };
+    
+    // Use the existing bullet shooting logic
+    this.shootEnemyBullet(tempEnemy, player);
   }
 }
