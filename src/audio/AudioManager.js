@@ -40,6 +40,8 @@ export class AudioManager {
     this.arpActive = false; // Whether arp is currently active
     this.arpPhase = 'warning'; // 'warning' or 'storm'
     this.arpNoteIndex = 0; // Current note in chord progression
+    this.arpGlobalGain = null; // Global gain node for arp envelope
+    this.arpStartTime = 0; // When arp started for envelope calculation
     
     // Random voice selection
     this.selectedVoice = null;
@@ -804,7 +806,22 @@ export class AudioManager {
     };
     
     const frequencies = chordProgressions[this.currentChord];
-    if (!frequencies) return null;
+    if (!frequencies || !Array.isArray(frequencies) || frequencies.length === 0) {
+      if (DEBUG) console.log(`createArp() returning null - no frequencies for chord: ${this.currentChord}`);
+      return null;
+    }
+    
+    // Ensure arpNoteIndex is within bounds
+    if (this.arpNoteIndex >= frequencies.length || this.arpNoteIndex < 0) {
+      this.arpNoteIndex = 0;
+    }
+    
+    // Validate the frequency value
+    const frequency = frequencies[this.arpNoteIndex];
+    if (!isFinite(frequency) || frequency <= 0) {
+      if (DEBUG) console.log(`createArp() returning null - invalid frequency: ${frequency} for chord: ${this.currentChord}`);
+      return null;
+    }
     
     // Create fat analog synth sound
     const oscillator = this.audioContext.createOscillator();
@@ -812,15 +829,21 @@ export class AudioManager {
     const filter = this.audioContext.createBiquadFilter();
     const saturationGain = this.audioContext.createGain();
     
-    // Connect audio chain
+    // Connect audio chain through global arp gain node
     oscillator.connect(saturationGain);
     saturationGain.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(this.soundtrackBus);
+    
+    // Route through global arp gain node if it exists, otherwise direct to soundtrack bus
+    if (this.arpGlobalGain) {
+      gainNode.connect(this.arpGlobalGain);
+    } else {
+      gainNode.connect(this.soundtrackBus);
+    }
     
     // Fat analog synth settings
     oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(frequencies[this.arpNoteIndex], this.audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
     
     // Saturation for fatness
     saturationGain.gain.setValueAtTime(2.0, this.audioContext.currentTime);
@@ -843,7 +866,7 @@ export class AudioManager {
     // Move to next note in chord
     this.arpNoteIndex = (this.arpNoteIndex + 1) % frequencies.length;
     
-    if (DEBUG) console.log(`Arp playing note ${this.arpNoteIndex} of chord ${this.currentChord} at ${frequencies[this.arpNoteIndex]}Hz`);
+    if (DEBUG) console.log(`Arp playing note ${this.arpNoteIndex} of chord ${this.currentChord} at ${frequency}Hz`);
     
     return oscillator;
   }
@@ -853,6 +876,23 @@ export class AudioManager {
     this.arpActive = true;
     this.arpPhase = phase;
     this.arpNoteIndex = 0;
+    this.arpStartTime = this.audioContext.currentTime;
+    
+    // Create global gain node for secondary envelope
+    if (!this.arpGlobalGain) {
+      this.arpGlobalGain = this.audioContext.createGain();
+      this.arpGlobalGain.connect(this.soundtrackBus);
+    }
+    
+    // Apply secondary envelope based on phase
+    if (phase === 'warning') {
+      // Gentle fade-in during 8th note phase
+      this.arpGlobalGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+      this.arpGlobalGain.gain.linearRampToValueAtTime(1.0, this.audioContext.currentTime + 2.0); // 2-second fade-in
+    } else {
+      // Full volume for triplet phase
+      this.arpGlobalGain.gain.setValueAtTime(1.0, this.audioContext.currentTime);
+    }
   }
 
   stopArp() {
