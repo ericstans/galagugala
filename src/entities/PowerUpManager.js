@@ -228,15 +228,20 @@ export class PowerUpManager {
 
   // Chain mechanic methods
   incrementChain(audioManager = null) {
-    this.chainCount++;
-    console.log(`Chain incremented to ${this.chainCount}`);
-    
-    // Trigger robot voice announcement for every 5th chain
-    if (this.chainCount % 5 === 0 && audioManager) {
-      const announcement = `${this.chainCount} chain`;
-      console.log(`Robot announcement: ${announcement}`);
-      // Use the truly flat robot voice for maximum monotone effect
-      audioManager.createRobotSpeech(announcement);
+    // Cap chain at 10
+    if (this.chainCount < 10) {
+      this.chainCount++;
+      console.log(`Chain incremented to ${this.chainCount}`);
+      
+      // Trigger robot voice announcement for every 5th chain
+      if (this.chainCount % 5 === 0 && audioManager) {
+        const announcement = this.chainCount === 10 ? 'MAX chain' : `${this.chainCount} chain`;
+        console.log(`Robot announcement: ${announcement}`);
+        // Use the truly flat robot voice for maximum monotone effect
+        audioManager.createRobotSpeech(announcement);
+      }
+    } else {
+      console.log(`Chain already at maximum (10)`);
     }
   }
 

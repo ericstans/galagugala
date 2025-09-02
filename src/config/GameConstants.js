@@ -43,17 +43,26 @@ export const GAME_CONFIG = {
   // Enemy bullet settings
   ENEMY_BULLET_GREEN_SPEED: 0.056,
   ENEMY_BULLET_RED_SPEED: 0.10,
+  ENEMY_BULLET_YELLOW_SPEED: 0.08,
   ENEMY_BULLET_GREEN_SIZE: 0.3,
   ENEMY_BULLET_RED_SIZE: 0.1,
+  ENEMY_BULLET_YELLOW_SIZE: 0.15,
   ENEMY_BULLET_GREEN_SPREAD: Math.PI / 6, // ±15 degrees
   ENEMY_BULLET_RED_SPREAD: Math.PI / 3, // ±30 degrees
+  ENEMY_BULLET_YELLOW_SPREAD: Math.PI / 4, // ±22.5 degrees (20% of screen width)
   ENEMY_BULLET_GREEN_CHANCE: 0.005,
   ENEMY_BULLET_RED_CHANCE: 0.005,
+  ENEMY_BULLET_YELLOW_CHANCE: 0.003,
   ENEMY_BULLET_GREEN_COOLDOWN: 120,
   ENEMY_BULLET_RED_COOLDOWN: 90,
+  ENEMY_BULLET_YELLOW_COOLDOWN: 150,
   ENEMY_BULLET_GREEN_LIFETIME: 600,
   ENEMY_BULLET_RED_LIFETIME: 300,
+  ENEMY_BULLET_YELLOW_LIFETIME: 450,
   ENEMY_BULLET_RED_MAX_ANGLE: Math.PI / 6, // 30 degrees from straight down
+  ENEMY_BULLET_YELLOW_COUNT: 5, // Base number of bullets in yellow spread
+  ENEMY_BULLET_YELLOW_VARIABLE_COUNT_START_LEVEL: 20, // Level when yellow bullets can have variable counts
+  ENEMY_BULLET_YELLOW_MULTIPLE_COUNT_START_LEVEL: 40, // Level when yellow bullets can have 3 different counts
   
   // Enemy diving settings
   ENEMY_DIVE_BASE_PROBABILITY: 0.02,
@@ -68,6 +77,7 @@ export const GAME_CONFIG = {
   // Enemy warning settings
   ENEMY_GREEN_WARNING_DURATION: 90, // 1.5 seconds
   ENEMY_RED_WARNING_DURATION: 120, // 2 seconds
+  ENEMY_YELLOW_WARNING_DURATION: 60, // 1 second
   ENEMY_RED_WARNING_BLINK_RATE: 12, // frames
   
   // Enemy geometry settings
@@ -109,8 +119,8 @@ export const GAME_CONFIG = {
   // Level progression settings
   ENEMY_LEVEL_COL_INCREMENT: 2, // Add column every 2 levels
   ENEMY_LEVEL_ROW_INCREMENT: 6, // Add row every 6 levels
-  ENEMY_MAX_ROWS: 10,
-  ENEMY_MAX_COLS: 12,
+  ENEMY_MAX_ROWS: 9,
+  ENEMY_MAX_COLS: 15,
   
   // Bullet frequency multipliers (level 35+)
   BULLET_FREQUENCY_MULTIPLIER_START_LEVEL: 35,

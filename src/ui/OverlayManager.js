@@ -298,7 +298,8 @@ export class OverlayManager {
         this.chainFadeTimeout = null;
       }
       
-      this.chainDisplay.textContent = chainCount;
+      // Show "MAX" instead of 10
+      this.chainDisplay.textContent = chainCount === 10 ? 'MAX' : chainCount;
       this.chainDisplay.style.display = 'block';
       this.chainDisplay.style.opacity = '1'; // Ensure it's fully visible
     }

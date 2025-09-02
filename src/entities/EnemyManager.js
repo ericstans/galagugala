@@ -220,13 +220,16 @@ export class EnemyManager {
         // Different bullet types based on level
         let shootChance;
         if (this.currentLevel >= 30) {
-          // Level 30+: Both green and red bullets active
-          shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE; // Base chance for either bullet type
+          // Level 30+: All bullet types active (green, red, yellow)
+          shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE; // Base chance for any bullet type
         } else if (this.currentLevel >= 20) {
-          // Level 20-29: Only red bullets
-          shootChance = GAME_CONFIG.ENEMY_BULLET_RED_CHANCE; // Red bullets are now half as frequent
+          // Level 20-29: Red and yellow bullets active
+          shootChance = GAME_CONFIG.ENEMY_BULLET_RED_CHANCE; // Base chance for red or yellow bullets
+        } else if (this.currentLevel >= 15) {
+          // Level 15-19: Green and yellow bullets active
+          shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE; // Base chance for green or yellow bullets
         } else {
-          // Level 10-19: Only green bullets
+          // Level 10-14: Only green bullets
           shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE;
         }
         
@@ -247,14 +250,17 @@ export class EnemyManager {
           }
           // Different cooldowns based on bullet type
           if (this.currentLevel >= 30) {
-            // Level 30+: Mixed bullet types, use average cooldown
-            this.bulletCooldown = (GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN) / 2 + Math.random() * 60; // Average cooldown
+            // Level 30+: All bullet types, use average cooldown
+            this.bulletCooldown = (GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_YELLOW_COOLDOWN) / 3 + Math.random() * 60;
           } else if (this.currentLevel >= 20) {
-            // Level 20-29: Only red bullets
-            this.bulletCooldown = GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN + Math.random() * 60; // Red bullets cooldown
+            // Level 20-29: Red and yellow bullets, use average cooldown
+            this.bulletCooldown = (GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_YELLOW_COOLDOWN) / 2 + Math.random() * 60;
+          } else if (this.currentLevel >= 15) {
+            // Level 15-19: Green and yellow bullets, use average cooldown
+            this.bulletCooldown = (GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_YELLOW_COOLDOWN) / 2 + Math.random() * 60;
           } else {
-            // Level 10-19: Only green bullets
-            this.bulletCooldown = GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + Math.random() * 60; // Green bullets cooldown
+            // Level 10-14: Only green bullets
+            this.bulletCooldown = GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + Math.random() * 60;
           }
         }
       }
@@ -543,16 +549,21 @@ export class EnemyManager {
   shootEnemyBullet(enemy, player) {
     let bulletGeometry, bulletMaterial, bulletSpeed, spreadAmount;
     
-    // Determine bullet type based on warning type (for level 30+) or level (for earlier levels)
-    const isRedBullet = (this.currentLevel >= 30 && enemy.userData.warningType === 'red') || 
-                       (this.currentLevel >= 20 && this.currentLevel < 30);
+    // Determine bullet type based on warning type
+    const bulletType = enemy.userData.warningType;
     
-    if (isRedBullet) {
+    if (bulletType === 'red') {
       // Red bullets - thick cylinders with high spread
       bulletGeometry = new THREE.CylinderGeometry(GAME_CONFIG.ENEMY_BULLET_RED_SIZE, GAME_CONFIG.ENEMY_BULLET_RED_SIZE, 0.5, 8);
       bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff6666 });
       bulletSpeed = GAME_CONFIG.ENEMY_BULLET_RED_SPEED;
       spreadAmount = GAME_CONFIG.ENEMY_BULLET_RED_SPREAD;
+    } else if (bulletType === 'yellow') {
+      // Yellow bullets - medium spheres, spread pattern
+      bulletGeometry = new THREE.SphereGeometry(GAME_CONFIG.ENEMY_BULLET_YELLOW_SIZE, 8, 6);
+      bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff66 });
+      bulletSpeed = GAME_CONFIG.ENEMY_BULLET_YELLOW_SPEED;
+      spreadAmount = GAME_CONFIG.ENEMY_BULLET_YELLOW_SPREAD;
     } else {
       // Green bullets - large circles, easier to dodge
       bulletGeometry = new THREE.SphereGeometry(GAME_CONFIG.ENEMY_BULLET_GREEN_SIZE, 8, 6);
@@ -577,14 +588,66 @@ export class EnemyManager {
     const spreadAxis = new THREE.Vector3(0, 0, 1); // Rotate around Z axis
     direction.applyAxisAngle(spreadAxis, spreadAngle);
     
+    if (bulletType === 'yellow') {
+      // Yellow bullets: Create variable number of bullets in a spread pattern, all going straight down
+      let bulletCount = GAME_CONFIG.ENEMY_BULLET_YELLOW_COUNT; // Default 5
+      
+      // Variable bullet counts based on level
+      if (this.currentLevel >= GAME_CONFIG.ENEMY_BULLET_YELLOW_MULTIPLE_COUNT_START_LEVEL) {
+        // Level 40+: 3 equal possibilities (5, 7, 9)
+        const countOptions = [5, 7, 9];
+        bulletCount = countOptions[Math.floor(Math.random() * countOptions.length)];
+      } else if (this.currentLevel >= GAME_CONFIG.ENEMY_BULLET_YELLOW_VARIABLE_COUNT_START_LEVEL) {
+        // Level 20+: 50% chance for 7 bullets, 50% chance for 5 bullets
+        bulletCount = Math.random() < 0.5 ? 7 : 5;
+      }
+      
+      const maxSpread = GAME_CONFIG.ENEMY_BULLET_YELLOW_SPREAD;
+      
+      for (let i = 0; i < bulletCount; i++) {
+        const yellowBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
+        
+        // Position bullet at enemy location
+        yellowBullet.position.copy(enemy.position);
+        yellowBullet.position.y -= 0.5; // Slightly below enemy
+        
+        // Calculate spread angle for this bullet
+        const spreadRatio = (i - (bulletCount - 1) / 2) / ((bulletCount - 1) / 2); // -1 to 1
+        const spreadAngle = spreadRatio * maxSpread;
+        
+        // Direction is straight down with horizontal spread
+        const direction = new THREE.Vector3(Math.sin(spreadAngle), -1, 0);
+        direction.normalize();
+        
+        // Set bullet properties
+        yellowBullet.userData = {
+          velocity: direction.clone().multiplyScalar(bulletSpeed),
+          lifetime: 0,
+          isGreen: false,
+          trailParticles: []
+        };
+        
+        // Add bullet to scene and array
+        this.scene.add(yellowBullet);
+        this.enemyBullets.push(yellowBullet);
+      }
+      
+      // Play yellow bullet sound effect
+      if (this.audioManager) {
+        this.audioManager.playYellowBulletFire();
+      }
+      return; // Exit early for yellow bullets
+    }
+    
+    // Single bullet for green and red types
     // Add some vertical spread as well (less for green bullets)
-    const verticalSpreadAmount = isRedBullet ? 0.3 : 0.15;
+    const verticalSpreadAmount = bulletType === 'red' ? 0.3 : 0.15;
     const verticalSpread = (Math.random() - 0.5) * verticalSpreadAmount;
     direction.y += verticalSpread;
     direction.normalize();
     
     // For red bullets, constrain to max angle from straight down
-    if (isRedBullet) {
+    if (bulletType === 'red') {
       const straightDown = new THREE.Vector3(0, -1, 0);
       const angleFromDown = direction.angleTo(straightDown);
       const maxAngle = GAME_CONFIG.ENEMY_BULLET_RED_MAX_ANGLE;
@@ -606,7 +669,7 @@ export class EnemyManager {
     bullet.userData = {
       velocity: direction.multiplyScalar(bulletSpeed),
       lifetime: 0,
-      isGreen: !isRedBullet,
+      isGreen: bulletType === 'green',
       trailParticles: []
     };
     
@@ -803,6 +866,14 @@ export class EnemyManager {
     bullet.userData.trailParticles = [];
   }
 
+  isEnemyInBackHalf(enemy) {
+    // Calculate which row this enemy is in based on its formationY position
+    // Back rows (closer to player) have higher row indices
+    const totalRows = this.enemies.length > 0 ? Math.max(...this.enemies.map(e => e.userData.row || 0)) + 1 : 1;
+    const enemyRow = enemy.userData.row || 0;
+    return enemyRow >= Math.floor(totalRows / 2);
+  }
+
   startEnemyWarning(enemy, player) {
     // Store original color and player reference
     enemy.userData.originalColor = enemy.material.color.getHex();
@@ -811,34 +882,38 @@ export class EnemyManager {
     enemy.userData.warningActive = true;
     enemy.userData.warningTime = 0;
     
-    if (this.currentLevel < 20) {
-      // Green bullets (level 10-19) - solid green warning
+    if (this.currentLevel < 15) {
+      // Green bullets (level 10-14) - solid green warning
       enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
       enemy.userData.warningType = 'green';
       // Change to green
       enemy.material.color.setHex(0x66ff66);
-    } else if (this.currentLevel < 30) {
-      // Red bullets (level 20-29) - dark red blinking warning
-      enemy.userData.warningDuration = GAME_CONFIG.ENEMY_RED_WARNING_DURATION;
-      enemy.userData.warningType = 'red';
-      enemy.userData.blinkTimer = 0;
-      enemy.userData.blinkRate = GAME_CONFIG.ENEMY_RED_WARNING_BLINK_RATE;
-      // Start with dark red
-      enemy.material.color.setHex(0x660000);
-      
-      // Play charge up sound for red bullets
-      if (this.audioManager) {
-        this.audioManager.playRedBulletCharge();
-      }
-    } else {
-      // Level 30+: Mixed bullet types - randomly choose green or red
-      if (Math.random() < 0.5) {
-        // Green bullet (50% chance)
+    } else if (this.currentLevel < 20) {
+      // Level 15-19: Green and yellow bullets - randomly choose
+      // Yellow bullets only from back half of rows
+      const canFireYellow = this.isEnemyInBackHalf(enemy);
+      if (canFireYellow && Math.random() < 0.5) {
+        // Yellow bullet (50% chance if in back half)
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_YELLOW_WARNING_DURATION;
+        enemy.userData.warningType = 'yellow';
+        enemy.material.color.setHex(0xffff66);
+      } else {
+        // Green bullet (default or if in front half)
         enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
         enemy.userData.warningType = 'green';
         enemy.material.color.setHex(0x66ff66);
+      }
+    } else if (this.currentLevel < 30) {
+      // Level 20-29: Red and yellow bullets - randomly choose
+      // Yellow bullets only from back half of rows
+      const canFireYellow = this.isEnemyInBackHalf(enemy);
+      if (canFireYellow && Math.random() < 0.5) {
+        // Yellow bullet (50% chance if in back half)
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_YELLOW_WARNING_DURATION;
+        enemy.userData.warningType = 'yellow';
+        enemy.material.color.setHex(0xffff66);
       } else {
-        // Red bullet (50% chance)
+        // Red bullet (default or if in front half)
         enemy.userData.warningDuration = GAME_CONFIG.ENEMY_RED_WARNING_DURATION;
         enemy.userData.warningType = 'red';
         enemy.userData.blinkTimer = 0;
@@ -849,6 +924,40 @@ export class EnemyManager {
         if (this.audioManager) {
           this.audioManager.playRedBulletCharge();
         }
+      }
+    } else {
+      // Level 30+: All bullet types - randomly choose green, red, or yellow
+      // Yellow bullets only from back half of rows
+      const canFireYellow = this.isEnemyInBackHalf(enemy);
+      const bulletType = Math.random();
+      
+      if (bulletType < 0.33) {
+        // Green bullet (33% chance)
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
+        enemy.userData.warningType = 'green';
+        enemy.material.color.setHex(0x66ff66);
+      } else if (bulletType < 0.66) {
+        // Red bullet (33% chance)
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_RED_WARNING_DURATION;
+        enemy.userData.warningType = 'red';
+        enemy.userData.blinkTimer = 0;
+        enemy.userData.blinkRate = GAME_CONFIG.ENEMY_RED_WARNING_BLINK_RATE;
+        enemy.material.color.setHex(0x660000);
+        
+        // Play charge up sound for red bullets
+        if (this.audioManager) {
+          this.audioManager.playRedBulletCharge();
+        }
+      } else if (canFireYellow) {
+        // Yellow bullet (34% chance, but only if in back half)
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_YELLOW_WARNING_DURATION;
+        enemy.userData.warningType = 'yellow';
+        enemy.material.color.setHex(0xffff66);
+      } else {
+        // Fallback to green bullet if yellow not allowed
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
+        enemy.userData.warningType = 'green';
+        enemy.material.color.setHex(0x66ff66);
       }
     }
   }

@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
 export class AudioManager {
   constructor() {
@@ -30,6 +30,11 @@ export class AudioManager {
     this.lastBeatTime = 0; // Track when the last beat occurred
     this.centralBeatScheduler = null; // Central beat scheduler for all layers
     this.activeLayers = new Set(); // Track which layers are currently active
+    
+    // Bongo rhythm pattern system
+    this.bongoPattern = null; // 4-bar pattern in 8th notes
+    this.bongoPatternPosition = 0; // Current position in pattern
+    this.bongoPatternLength = 32; // 4 bars * 8 beats = 32 8th notes
     
     // Random voice selection
     this.selectedVoice = null;
@@ -402,6 +407,45 @@ export class AudioManager {
     return oscillator;
   }
 
+  createYellowBulletSound() {
+    if (!this.audioContext) return null;
+    
+    // Create a rapid "rat-tat-tat" sound for yellow bullet spread
+    const oscillators = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+      const filter = this.audioContext.createBiquadFilter();
+      
+      oscillator.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Higher frequency for yellow bullets
+      oscillator.frequency.setValueAtTime(800 + (i * 100), this.audioContext.currentTime);
+      oscillator.type = 'square';
+      
+      // Quick filter sweep
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(2000, this.audioContext.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
+      
+      // Quick burst with slight delay for each oscillator
+      const startTime = this.audioContext.currentTime + (i * 0.02);
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.08, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + 0.08);
+      
+      oscillators.push(oscillator);
+    }
+    
+    return oscillators;
+  }
+
   // Background ambient sound
   createBackgroundSound() {
     if (!this.audioContext) return null;
@@ -482,6 +526,11 @@ export class AudioManager {
   playRedBulletFire() {
     if (!this.audioContext) return;
     this.createRedBulletFireSound();
+  }
+
+  playYellowBulletFire() {
+    if (!this.audioContext) return;
+    this.createYellowBulletSound();
   }
 
   startBackgroundSound() {
@@ -625,7 +674,10 @@ export class AudioManager {
       noteType = 'root';
     }
     
-    console.log(`Bass playing ${noteType} note for: ${this.currentChord} (${noteFreq}Hz) on beat ${(this.bassBeatCounter % 4) + 1}`);
+    // Determine bass timbre based on level (switch every 15 levels)
+    const timbreIndex = Math.floor((this.currentLevel - 1) / 15) % 3; // 0, 1, or 2
+    
+    console.log(`Bass playing ${noteType} note for: ${this.currentChord} (${noteFreq}Hz) on beat ${(this.bassBeatCounter % 4) + 1} with timbre ${timbreIndex + 1}`);
     
     const oscillator = this.audioContext.createOscillator();
     const gainNode = this.audioContext.createGain();
@@ -635,12 +687,31 @@ export class AudioManager {
     filter.connect(gainNode);
     gainNode.connect(this.soundtrackBus);
     
-    oscillator.type = 'sawtooth';
+    // Set oscillator type and filter based on timbre
+    switch (timbreIndex) {
+      case 0:
+        // Original timbre: Sawtooth with 200Hz lowpass
+        oscillator.type = 'sawtooth';
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(200, this.audioContext.currentTime);
+        break;
+      case 1:
+        // Second timbre: Triangle with 150Hz lowpass (mellower)
+        oscillator.type = 'triangle';
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(150, this.audioContext.currentTime);
+        break;
+      case 2:
+        // Third timbre: Square with 120Hz lowpass (deepest/mellowest)
+        oscillator.type = 'square';
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(120, this.audioContext.currentTime);
+        break;
+    }
+    
     oscillator.frequency.setValueAtTime(noteFreq, this.audioContext.currentTime);
     
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(200, this.audioContext.currentTime);
-    
+    // Consistent gain envelope for all timbres (matching loudness)
     gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
     gainNode.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 0.1);
     gainNode.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 0.4);
@@ -650,6 +721,108 @@ export class AudioManager {
     oscillator.stop(this.audioContext.currentTime + 0.5);
     
     return oscillator;
+  }
+
+  createBongos(pitch = 'high') {
+    if (!this.audioContext) return null;
+    if (DEBUG) console.log(`createBongos() called with pitch: ${pitch}`);
+    
+    // Create single bongo sound with chosen pitch
+    const bongo = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    
+    // Create stereo panner
+    const panner = this.audioContext.createStereoPanner();
+    
+    // Connect audio chain with panning
+    bongo.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(panner);
+    panner.connect(this.soundtrackBus);
+    
+    // Set pitch based on parameter
+    bongo.type = 'sine';
+    if (pitch === 'high') {
+      bongo.frequency.setValueAtTime(250, this.audioContext.currentTime); // Higher pitch
+      panner.pan.setValueAtTime(-0.33, this.audioContext.currentTime); // 33% left
+    } else {
+      bongo.frequency.setValueAtTime(150, this.audioContext.currentTime); // Lower pitch
+      panner.pan.setValueAtTime(0.66, this.audioContext.currentTime); // 66% right
+    }
+    
+    // Low-pass filter for warmth
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    
+    // Quick attack, short decay envelope
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.6, this.audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
+    
+    // Start oscillator
+    bongo.start(this.audioContext.currentTime);
+    bongo.stop(this.audioContext.currentTime + 0.2);
+    
+    if (DEBUG) console.log(`Bongo (${pitch}) started and will stop in 0.2 seconds, panned ${pitch === 'high' ? '33% left' : '66% right'}`);
+    
+    return bongo;
+  }
+
+  generateBongoPattern() {
+    // Generate a 4-bar pattern in 8th notes (32 total positions)
+    // 40% density means about 13 hits out of 32 positions
+    // Prioritize off-beats from 4th and 8th notes (positions 1, 3, 5, 7, 9, 11, 13, 15, etc.)
+    
+    const pattern = new Array(32).fill(false);
+    const totalPositions = 32;
+    const targetHits = Math.floor(totalPositions * 0.40); // 40% density
+    
+    // Define off-beat positions (prioritized) - every odd position
+    const offBeatPositions = [];
+    for (let i = 1; i < totalPositions; i += 2) {
+      offBeatPositions.push(i);
+    }
+    
+    // Define on-beat positions (less prioritized) - every even position
+    const onBeatPositions = [];
+    for (let i = 0; i < totalPositions; i += 2) {
+      onBeatPositions.push(i);
+    }
+    
+    // Fill pattern prioritizing off-beats
+    const selectedPositions = [];
+    
+    // First, fill with off-beats (70% of target hits)
+    const offBeatTarget = Math.floor(targetHits * 0.7);
+    const shuffledOffBeats = [...offBeatPositions].sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < offBeatTarget && i < shuffledOffBeats.length; i++) {
+      selectedPositions.push(shuffledOffBeats[i]);
+    }
+    
+    // Then fill remaining with on-beats
+    const remainingHits = targetHits - selectedPositions.length;
+    const shuffledOnBeats = [...onBeatPositions].sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < remainingHits && i < shuffledOnBeats.length; i++) {
+      selectedPositions.push(shuffledOnBeats[i]);
+    }
+    
+    // Set the pattern
+    selectedPositions.forEach(position => {
+      pattern[position] = Math.random() < 0.5 ? 'high' : 'low'; // Randomly assign pitch
+    });
+    
+    this.bongoPattern = pattern;
+    this.bongoPatternPosition = 0;
+    this.bongoPatternLength = 32; // Update length for 8th notes
+    
+    if (DEBUG) console.log(`Generated bongo pattern with ${selectedPositions.length} hits (40% density, 8th notes)`);
+    if (DEBUG) console.log('Off-beat hits:', selectedPositions.filter(pos => pos % 2 === 1).length);
+    if (DEBUG) console.log('On-beat hits:', selectedPositions.filter(pos => pos % 2 === 0).length);
+    
+    return pattern;
   }
 
   createChords() {
@@ -672,7 +845,7 @@ export class AudioManager {
     
     const frequencies = chordProgressions[this.currentChord];
     
-    console.log(`Playing chord: ${this.currentChord}`);
+    if (DEBUG) console.log(`Playing chord: ${this.currentChord}`);
     
     const chord = [];
     
@@ -683,12 +856,44 @@ export class AudioManager {
       const bitcrusher = this.audioContext.createWaveShaper();
       const lowpassFilter = this.audioContext.createBiquadFilter();
       
-      // Create audio chain: oscillator -> saturation -> bitcrusher -> lowpass -> gain -> master
+      // Create basic audio chain: oscillator -> saturation -> bitcrusher -> lowpass -> gain
       oscillator.connect(saturationGain);
       saturationGain.connect(bitcrusher);
       bitcrusher.connect(lowpassFilter);
       lowpassFilter.connect(gainNode);
-      gainNode.connect(this.soundtrackBus);
+      
+      // Check if only chords are playing (level 13-14)
+      const isChordsOnly = this.activeLayers.size === 1 && this.activeLayers.has('chords');
+      
+      if (isChordsOnly) {
+        // Add delay effect for chords-only mode
+        const delayNode = this.audioContext.createDelay(1.0); // Max 1 second delay
+        const delayGain = this.audioContext.createGain();
+        const feedbackGain = this.audioContext.createGain();
+        
+        // Calculate quarter note delay time at current BPM (64 BPM when chords-only)
+        const currentBpm = this.bpm / 2; // 64 BPM when chords-only
+        const quarterNoteDelay = 60 / currentBpm; // Convert BPM to quarter note duration in seconds
+        
+        // Set up delay parameters
+        delayNode.delayTime.setValueAtTime(quarterNoteDelay, this.audioContext.currentTime); // Quarter note delay
+        delayGain.gain.setValueAtTime(0.4, this.audioContext.currentTime); // 40% wet signal
+        feedbackGain.gain.setValueAtTime(0.2, this.audioContext.currentTime); // 20% feedback
+        
+        // Create delay chain: gainNode -> delay -> delayGain -> soundtrackBus
+        // Also create feedback loop: delay -> feedbackGain -> delay
+        gainNode.connect(delayNode);
+        delayNode.connect(delayGain);
+        delayGain.connect(this.soundtrackBus);
+        delayNode.connect(feedbackGain);
+        feedbackGain.connect(delayNode);
+        
+        // Also connect dry signal
+        gainNode.connect(this.soundtrackBus);
+      } else {
+        // Normal chain without delay
+        gainNode.connect(this.soundtrackBus);
+      }
       
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
@@ -732,22 +937,31 @@ export class AudioManager {
     const soundtrackPhase = Math.floor((level - 1) / 2) + 1;
     const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
     
+    let layers;
     switch (cyclePhase) {
-      case 1: return ['kick'];
-      case 2: return ['kick', 'hats'];
-      case 3: return ['kick', 'hats', 'bass'];
-      case 4: return ['kick', 'hats', 'bass', 'chords'];
-      case 5: return ['hats', 'bass', 'chords'];
-      case 6: return ['bass', 'chords'];
-      case 7: return ['chords'];
-      case 8: return ['bass', 'chords'];
-      case 9: return ['hats', 'bass', 'chords'];
-      case 10: return ['kick', 'hats', 'bass', 'chords'];
-      case 11: return ['kick', 'hats', 'bass'];
-      case 12: return ['kick', 'hats'];
-      case 13: return ['kick'];
-      default: return ['kick'];
+      case 1: layers = ['kick']; break;
+      case 2: layers = ['kick', 'hats']; break;
+      case 3: layers = ['kick', 'hats', 'bass']; break;
+      case 4: layers = ['kick', 'hats', 'bass', 'chords']; break;
+      case 5: layers = ['hats', 'bass', 'chords']; break;
+      case 6: layers = ['bass', 'chords']; break;
+      case 7: layers = ['chords']; break;
+      case 8: layers = ['bass', 'chords']; break;
+      case 9: layers = ['hats', 'bass', 'chords']; break;
+      case 10: layers = ['kick', 'hats', 'bass', 'chords']; break;
+      case 11: layers = ['kick', 'hats', 'bass']; break;
+      case 12: layers = ['kick', 'hats']; break;
+      case 13: layers = ['kick']; break;
+      default: layers = ['kick']; break;
     }
+    
+    // Add bongos on every level ending in 8 or 9, but not when only chords are playing
+    if ((level % 10 === 8 || level % 10 === 9) && !(layers.length === 1 && layers.includes('chords'))) {
+      if (DEBUG) console.log(`Adding bongos to level ${level}, layers:`, layers);
+      layers.push('bongos');
+    }
+    
+    return layers;
   }
 
   updateSoundtrack(level) {
@@ -756,7 +970,7 @@ export class AudioManager {
     
     // Only update layers if AudioContext is available
     if (!this.audioContext) {
-      console.log(`Level ${level}: AudioContext not available, soundtrack will start when user interacts`);
+      if (DEBUG) console.log(`Level ${level}: AudioContext not available, soundtrack will start when user interacts`);
       return;
     }
     
@@ -771,26 +985,38 @@ export class AudioManager {
     const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
     const activeLayers = this.getLayersForLevel(this.currentLevel);
     
-    console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Updating layers:`, activeLayers);
+    if (DEBUG) console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Updating layers:`, activeLayers);
+    
+    // Check if bongos are starting (weren't active before, but are now)
+    const bongosStarting = !this.activeLayers.has('bongos') && activeLayers.includes('bongos');
     
     // Update the active layers set
     this.activeLayers.clear();
     activeLayers.forEach(layer => this.activeLayers.add(layer));
     
-    // If no central beat scheduler exists, start it
-    if (!this.centralBeatScheduler) {
-      this.startCentralBeatScheduler();
+    // Generate new bongo pattern when bongos start or if bongos are active but no pattern exists
+    if (bongosStarting || (this.activeLayers.has('bongos') && !this.bongoPattern)) {
+      if (DEBUG) console.log(`Bongos starting on level ${this.currentLevel}, generating new pattern`);
+      this.generateBongoPattern();
     }
+    
+    // Restart beat scheduler if layers changed (to update BPM)
+    if (this.centralBeatScheduler) {
+      this.stopCentralBeatScheduler();
+    }
+    this.startCentralBeatScheduler();
   }
 
   startCentralBeatScheduler() {
     if (!this.audioContext || this.centralBeatScheduler) return;
     
-    const beatDuration = 60000 / this.bpm; // milliseconds per beat
+    // Halve BPM when only chords are playing
+    const effectiveBpm = this.activeLayers.size === 1 && this.activeLayers.has('chords') ? this.bpm * 2/3 : this.bpm;
+    const beatDuration = 60000 / effectiveBpm; // milliseconds per beat
     const eighthNote = beatDuration / 2;
     const fourBeats = beatDuration * 4; // 4 beats duration
     
-    console.log('Starting central beat scheduler');
+    if (DEBUG) console.log('Starting central beat scheduler');
     
     this.centralBeatScheduler = setInterval(() => {
       this.globalBeatCounter++;
@@ -820,6 +1046,30 @@ export class AudioManager {
         // Chords play every 4 beats on beat 1
         this.createChords();
       }
+      
+      if (this.activeLayers.has('bongos')) {
+        if (this.bongoPattern) {
+          // For 8th notes, we need to check 2 times per beat
+          // Calculate the 8th note position within the current beat
+          const eighthNotePosition = (this.globalBeatCounter * 2) % this.bongoPatternLength;
+          
+          // Check all 2 8th note positions within this beat
+          for (let i = 0; i < 2; i++) {
+            const position = (eighthNotePosition + i) % this.bongoPatternLength;
+            const bongoHit = this.bongoPattern[position];
+            if (bongoHit) {
+              // Schedule the bongo hit at the appropriate time within the beat
+              const delayTime = (i * beatDuration) / 2; // Delay in milliseconds
+              setTimeout(() => {
+                if (DEBUG) console.log(`Playing bongos at beat ${this.globalBeatCounter}, 8th note position ${position}, pitch: ${bongoHit}`);
+                this.createBongos(bongoHit);
+              }, delayTime);
+            }
+          }
+        } else {
+          if (DEBUG) console.log(`Bongos active but no pattern exists at beat ${this.globalBeatCounter}`);
+        }
+      }
     }, beatDuration);
   }
 
@@ -827,7 +1077,7 @@ export class AudioManager {
     if (this.centralBeatScheduler) {
       clearInterval(this.centralBeatScheduler);
       this.centralBeatScheduler = null;
-      console.log('Stopped central beat scheduler');
+      if (DEBUG) console.log('Stopped central beat scheduler');
     }
   }
 
@@ -839,7 +1089,7 @@ export class AudioManager {
     const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
     const activeLayers = this.getLayersForLevel(this.currentLevel);
     
-    console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Starting layers:`, activeLayers);
+    if (DEBUG) console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Starting layers:`, activeLayers);
     
     // Initialize global beat tracking for first start
     this.globalBeatCounter = 0;
@@ -851,6 +1101,12 @@ export class AudioManager {
     
     // Set up active layers and start central scheduler
     activeLayers.forEach(layer => this.activeLayers.add(layer));
+    
+    // Generate bongo pattern if bongos are active
+    if (this.activeLayers.has('bongos')) {
+      this.generateBongoPattern();
+    }
+    
     this.startCentralBeatScheduler();
   }
 
@@ -862,7 +1118,7 @@ export class AudioManager {
   // Initialize voice selection when audio manager starts
   initializeVoiceSelection() {
     if (!('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported');
+      if (DEBUG) console.warn('Speech synthesis not supported');
       return;
     }
     
@@ -882,7 +1138,7 @@ export class AudioManager {
   // Select a random voice from available voices
   selectRandomVoice() {
     if (!('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported');
+      if (DEBUG) console.warn('Speech synthesis not supported');
       return;
     }
     
@@ -900,7 +1156,7 @@ export class AudioManager {
   // Robot voice using Web Speech API with robot-like parameters
   createRobotSpeech(text, rate = 1.2) {
     if (!('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported');
+      if (DEBUG) console.warn('Speech synthesis not supported');
       return;
     }
     
