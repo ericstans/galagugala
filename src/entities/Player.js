@@ -90,6 +90,30 @@ export class Player {
     spaceship.rotation.z = Math.PI; // Rotate 180 degrees to point upward
     spaceship.position.y = -6.5; // Move further toward the bottom
     
+    // Add thicker outlines using multiple overlapping lines
+    const edgeGeometry = new THREE.EdgesGeometry(geometry);
+    const edgeMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x00ccff, // Slightly darker cyan for outlines
+      linewidth: 1
+    });
+    
+    // Create multiple line segments with slight offsets to simulate thickness
+    const offsets = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0.01, y: 0, z: 0 },
+      { x: -0.01, y: 0, z: 0 },
+      { x: 0, y: 0.01, z: 0 },
+      { x: 0, y: -0.01, z: 0 },
+      { x: 0, y: 0, z: 0.01 },
+      { x: 0, y: 0, z: -0.01 }
+    ];
+    
+    offsets.forEach(offset => {
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+      edges.position.set(offset.x, offset.y, offset.z);
+      spaceship.add(edges);
+    });
+    
     this.scene.add(spaceship);
     return spaceship;
   }
@@ -106,6 +130,30 @@ export class Player {
     cockpit.position.set(0, -0.2, 0.125); // Move toward the front of the ship (negative Y)
     cockpit.rotation.x = Math.PI; // Face upward
     
+    // Add outlines to cockpit
+    const cockpitEdgeGeometry = new THREE.EdgesGeometry(cockpitGeometry);
+    const cockpitEdgeMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x0011cc, // Darker blue for cockpit outlines
+      linewidth: 1
+    });
+    
+    // Create multiple line segments with slight offsets to simulate thickness
+    const cockpitOffsets = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0.01, y: 0, z: 0 },
+      { x: -0.01, y: 0, z: 0 },
+      { x: 0, y: 0.01, z: 0 },
+      { x: 0, y: -0.01, z: 0 },
+      { x: 0, y: 0, z: 0.01 },
+      { x: 0, y: 0, z: -0.01 }
+    ];
+    
+    cockpitOffsets.forEach(offset => {
+      const cockpitEdges = new THREE.LineSegments(cockpitEdgeGeometry, cockpitEdgeMaterial);
+      cockpitEdges.position.set(offset.x, offset.y, offset.z);
+      cockpit.add(cockpitEdges);
+    });
+    
     this.mesh.add(cockpit);
     return cockpit;
   }
@@ -117,6 +165,30 @@ export class Player {
     this.leftEngine = new THREE.Mesh(leftEngineGeometry, engineMaterial);
     this.leftEngine.position.set(-0.15, 0.3, 0.05); // Back of ship, left side (positive Y is back since ship is rotated)
     this.leftEngine.rotation.x = Math.PI / 2; // Point backward along Y axis
+    
+    // Add outlines to left engine
+    const leftEngineEdgeGeometry = new THREE.EdgesGeometry(leftEngineGeometry);
+    const engineEdgeMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x111111, // Dark gray for engine outlines
+      linewidth: 1
+    });
+    
+    const engineOffsets = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0.01, y: 0, z: 0 },
+      { x: -0.01, y: 0, z: 0 },
+      { x: 0, y: 0.01, z: 0 },
+      { x: 0, y: -0.01, z: 0 },
+      { x: 0, y: 0, z: 0.01 },
+      { x: 0, y: 0, z: -0.01 }
+    ];
+    
+    engineOffsets.forEach(offset => {
+      const leftEngineEdges = new THREE.LineSegments(leftEngineEdgeGeometry, engineEdgeMaterial);
+      leftEngineEdges.position.set(offset.x, offset.y, offset.z);
+      this.leftEngine.add(leftEngineEdges);
+    });
+    
     this.mesh.add(this.leftEngine);
 
     // Right engine
@@ -124,6 +196,16 @@ export class Player {
     this.rightEngine = new THREE.Mesh(rightEngineGeometry, engineMaterial);
     this.rightEngine.position.set(0.15, 0.3, 0.05); // Back of ship, right side (positive Y is back since ship is rotated)
     this.rightEngine.rotation.x = Math.PI / 2; // Point backward along Y axis
+    
+    // Add outlines to right engine
+    const rightEngineEdgeGeometry = new THREE.EdgesGeometry(rightEngineGeometry);
+    
+    engineOffsets.forEach(offset => {
+      const rightEngineEdges = new THREE.LineSegments(rightEngineEdgeGeometry, engineEdgeMaterial);
+      rightEngineEdges.position.set(offset.x, offset.y, offset.z);
+      this.rightEngine.add(rightEngineEdges);
+    });
+    
     this.mesh.add(this.rightEngine);
 
     // Create particle systems for thrust
@@ -349,6 +431,30 @@ export class Player {
     const wingGeometry = new THREE.BoxGeometry(0.4, 0.15, 0.08);
     const wingMaterial = new THREE.MeshBasicMaterial({ color: 0x00fffc });
     const wingBody = new THREE.Mesh(wingGeometry, wingMaterial);
+    
+    // Add outlines to wing body
+    const wingEdgeGeometry = new THREE.EdgesGeometry(wingGeometry);
+    const wingEdgeMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x00ccff, // Slightly darker cyan for wing outlines
+      linewidth: 1
+    });
+    
+    const wingOffsets = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0.01, y: 0, z: 0 },
+      { x: -0.01, y: 0, z: 0 },
+      { x: 0, y: 0.01, z: 0 },
+      { x: 0, y: -0.01, z: 0 },
+      { x: 0, y: 0, z: 0.01 },
+      { x: 0, y: 0, z: -0.01 }
+    ];
+    
+    wingOffsets.forEach(offset => {
+      const wingEdges = new THREE.LineSegments(wingEdgeGeometry, wingEdgeMaterial);
+      wingEdges.position.set(offset.x, offset.y, offset.z);
+      wingBody.add(wingEdges);
+    });
+    
     wingGroup.add(wingBody);
     
     // Gun launcher at tip
@@ -357,6 +463,30 @@ export class Player {
     const gun = new THREE.Mesh(gunGeometry, gunMaterial);
     // No rotation needed - cylinder is already oriented correctly for upward pointing
     gun.position.set(side === 'left' ? -0.25 : 0.25, 0, 0);
+    
+    // Add outlines to gun
+    const gunEdgeGeometry = new THREE.EdgesGeometry(gunGeometry);
+    const gunEdgeMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x333333, // Dark gray for gun outlines
+      linewidth: 1
+    });
+    
+    const gunOffsets = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0.01, y: 0, z: 0 },
+      { x: -0.01, y: 0, z: 0 },
+      { x: 0, y: 0.01, z: 0 },
+      { x: 0, y: -0.01, z: 0 },
+      { x: 0, y: 0, z: 0.01 },
+      { x: 0, y: 0, z: -0.01 }
+    ];
+    
+    gunOffsets.forEach(offset => {
+      const gunEdges = new THREE.LineSegments(gunEdgeGeometry, gunEdgeMaterial);
+      gunEdges.position.set(offset.x, offset.y, offset.z);
+      gun.add(gunEdges);
+    });
+    
     wingGroup.add(gun);
     
     // Position wing relative to ship (moved 10px lower on Y axis - positive Y since ship is rotated)

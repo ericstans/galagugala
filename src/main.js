@@ -364,6 +364,42 @@ class Game {
       this.audio.playHit();
     }
     
+    // Enemy bullet-player collision (level 10+)
+    if (gameState.isPlaying && !gameState.playerDestroyed && this.enemies && this.currentLevel >= 10) {
+      const enemyBulletCollision = CollisionManager.checkEnemyBulletPlayerCollision(
+        this.enemies.enemyBullets,
+        this.player
+      );
+      
+      if (enemyBulletCollision && !this.player.isInvulnerable) {
+        // Mark player as destroyed
+        this.engine.setGameState({
+          playerDestroyed: true,
+          isPlaying: false
+        });
+        
+        // Create explosion at player position
+        this.effects.createExplosion(this.player.position);
+        
+        // Remove player ship
+        this.player.destroy();
+        
+        // Remove the bullet that hit and clean up its trail
+        const hitBullet = enemyBulletCollision.bullet;
+        if (hitBullet.userData.isGreen) {
+          this.enemies.cleanupBulletTrail(hitBullet);
+        }
+        this.engine.scene.remove(hitBullet);
+        this.enemies.enemyBullets.splice(enemyBulletCollision.bulletIndex, 1);
+        
+        // Play explosion sound
+        this.audio.playExplosion();
+        
+        // Announce ship destruction
+        this.audio.createRobotSpeech("Ship Destroyed");
+      }
+    }
+
     // Player-power-up collision
     if (gameState.isPlaying && !gameState.playerDestroyed) {
       const powerUpResult = this.powerUps.checkCollisions(this.player, this.audio);
@@ -433,6 +469,9 @@ class Game {
         // Play explosion sound
         this.audio.playExplosion();
         
+        // Announce wing destruction
+        this.audio.createRobotSpeech("Wing Destroyed");
+        
         if (DEBUG) console.log(`${side} wing destroyed!`);
       }
     }
@@ -459,6 +498,9 @@ class Game {
         
         // Play explosion sound
         this.audio.playExplosion();
+        
+        // Announce ship destruction
+        this.audio.createRobotSpeech("Ship Destroyed");
       }
     }
     

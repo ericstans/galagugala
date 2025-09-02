@@ -73,4 +73,14 @@ export class CollisionManager {
     }
     return null;
   }
+
+  static checkEnemyBulletPlayerCollision(enemyBullets, player, threshold = GAME_CONFIG.COLLISION_THRESHOLD) {
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      const bullet = enemyBullets[i];
+      if (this.checkCollision(bullet, player, threshold)) {
+        return { bulletIndex: i, bullet };
+      }
+    }
+    return null;
+  }
 }

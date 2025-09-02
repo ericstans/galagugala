@@ -18,6 +18,13 @@ export class EnemyManager {
     this.initialColumnStructure = {}; // Track initial column structure
     this.processedColumns = new Set(); // Track which columns have already spawned power-ups
     this.lastEnemyInColumn = {}; // Track the last enemy destroyed in each column
+    
+    // Enemy bullet system (level 10+)
+    this.enemyBullets = [];
+    this.bulletCooldown = 0;
+    this.currentLevel = level;
+    this.bulletTrails = []; // Store trail particles for green bullets
+    
     this.createEnemies(level, gameEngine);
   }
 
@@ -93,14 +100,29 @@ export class EnemyManager {
       for (let col = 0; col < totalCols; col++) {
         const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
         
-        // Add darker red edges
+        // Add thicker darker red edges using multiple overlapping lines
         const edgeGeometry = new THREE.EdgesGeometry(scaledGeometry);
         const edgeMaterial = new THREE.LineBasicMaterial({ 
           color: 0xcc1111, // Darker red
-          linewidth: 2
+          linewidth: 1
         });
-        const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-        enemy.add(edges);
+        
+        // Create multiple line segments with slight offsets to simulate thickness
+        const offsets = [
+          { x: 0, y: 0, z: 0 },
+          { x: 0.01, y: 0, z: 0 },
+          { x: -0.01, y: 0, z: 0 },
+          { x: 0, y: 0.01, z: 0 },
+          { x: 0, y: -0.01, z: 0 },
+          { x: 0, y: 0, z: 0.01 },
+          { x: 0, y: 0, z: -0.01 }
+        ];
+        
+        offsets.forEach(offset => {
+          const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+          edges.position.set(offset.x, offset.y, offset.z);
+          enemy.add(edges);
+        });
         
         // Center the formation within the visible bounds
         const formationX = (col - (totalCols - 1) / 2) * clampedXSpacing;
@@ -180,6 +202,30 @@ export class EnemyManager {
       this.diveCooldown = 60 + Math.random() * 60;
     }
 
+    // Enemy bullet system (level 10+)
+    if (this.currentLevel >= 10 && !divingDisabled) {
+      if (this.bulletCooldown > 0) this.bulletCooldown--;
+      else if (this.enemies.length > 0 && gameState.isPlaying && !gameState.playerDestroyed) {
+        // Different bullet types based on level
+        const shootChance = this.currentLevel >= 20 ? 0.01 : 0.005; // Red bullets are rarer
+        if (Math.random() < shootChance) {
+          // Find formation enemies that can shoot
+          const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation' && !e.userData.warningActive);
+          if (formationEnemies.length > 0) {
+            const shooter = formationEnemies[Math.floor(Math.random() * formationEnemies.length)];
+            this.startEnemyWarning(shooter, player);
+          }
+          // Different cooldowns based on bullet type
+          this.bulletCooldown = this.currentLevel >= 20 ? 
+            (90 + Math.random() * 60) : // Red bullets: 1.5-2.5 seconds
+            (120 + Math.random() * 60); // Green bullets: 2-3 seconds
+        }
+      }
+    }
+
+    // Update enemy warnings
+    this.updateEnemyWarnings();
+
     this.enemies.forEach(enemy => {
       if (enemy.userData.state === 'formation') {
         // Small wiggle for life
@@ -253,6 +299,9 @@ export class EnemyManager {
         }
       }
     });
+
+    // Update enemy bullets
+    this.updateEnemyBullets();
   }
 
   findFormationGroups(enemies) {
@@ -443,5 +492,255 @@ export class EnemyManager {
     this.enemies = [];
     this.processedColumns.clear();
     this.lastEnemyInColumn = {};
+    
+    // Clear enemy bullets and their trails
+    this.enemyBullets.forEach(bullet => {
+      if (bullet.userData.isGreen) {
+        this.cleanupBulletTrail(bullet);
+      }
+      this.scene.remove(bullet);
+    });
+    this.enemyBullets = [];
+  }
+
+  shootEnemyBullet(enemy, player) {
+    let bulletGeometry, bulletMaterial, bulletSpeed, spreadAmount;
+    
+    if (this.currentLevel >= 20) {
+      // Red bullets (level 20+) - thick cylinders with high spread
+      bulletGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.5, 8);
+      bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff6666 });
+      bulletSpeed = 0.15;
+      spreadAmount = Math.PI / 3; // ±30 degrees
+    } else {
+      // Green bullets (level 10-19) - large circles, easier to dodge
+      bulletGeometry = new THREE.SphereGeometry(0.3, 8, 6); // Twice as wide (0.15 * 2)
+      bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff66 });
+      bulletSpeed = 0.056; // 70% of 0.08 (0.08 * 0.7)
+      spreadAmount = Math.PI / 6; // ±15 degrees (less spread)
+    }
+    
+    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+    
+    // Position bullet at enemy location
+    bullet.position.copy(enemy.position);
+    bullet.position.y -= 0.5; // Slightly below enemy
+    
+    // Calculate direction to player with random spread
+    const direction = new THREE.Vector3();
+    direction.subVectors(player.position, enemy.position);
+    direction.normalize();
+    
+    // Add random spread based on bullet type
+    const spreadAngle = (Math.random() - 0.5) * spreadAmount;
+    const spreadAxis = new THREE.Vector3(0, 0, 1); // Rotate around Z axis
+    direction.applyAxisAngle(spreadAxis, spreadAngle);
+    
+    // Add some vertical spread as well (less for green bullets)
+    const verticalSpreadAmount = this.currentLevel >= 20 ? 0.3 : 0.15;
+    const verticalSpread = (Math.random() - 0.5) * verticalSpreadAmount;
+    direction.y += verticalSpread;
+    direction.normalize();
+    
+    // Store bullet data
+    bullet.userData = {
+      velocity: direction.multiplyScalar(bulletSpeed),
+      lifetime: 0,
+      isGreen: this.currentLevel < 20,
+      trailParticles: []
+    };
+    
+    // Create trail for green bullets
+    if (bullet.userData.isGreen) {
+      this.createBulletTrail(bullet);
+    }
+    
+    this.scene.add(bullet);
+    this.enemyBullets.push(bullet);
+  }
+
+  updateEnemyBullets() {
+    for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+      const bullet = this.enemyBullets[i];
+      
+      // Move bullet
+      bullet.position.add(bullet.userData.velocity);
+      bullet.userData.lifetime++;
+      
+      // Update trail for green bullets
+      if (bullet.userData.isGreen) {
+        this.updateBulletTrail(bullet);
+      }
+      
+      // Remove bullet if it goes off screen or lives too long
+      // Green bullets get longer lifetime to let trails fade naturally
+      const maxLifetime = bullet.userData.isGreen ? 600 : 300;
+      if (bullet.position.y < -8 || bullet.userData.lifetime > maxLifetime) {
+        // Clean up trail particles
+        if (bullet.userData.isGreen) {
+          this.cleanupBulletTrail(bullet);
+        }
+        this.scene.remove(bullet);
+        this.enemyBullets.splice(i, 1);
+      }
+    }
+  }
+
+  createBulletTrail(bullet) {
+    // Create trail particles with double-sine wave pattern
+    const trailLength = 8; // Number of trail particles
+    const trailSpacing = 0.3; // Distance between particles
+    
+    for (let i = 0; i < trailLength; i++) {
+      // Create first trail particle
+      const trailGeometry1 = new THREE.SphereGeometry(0.08, 6, 4);
+      const trailMaterial1 = new THREE.MeshBasicMaterial({ 
+        color: 0x66ff66,
+        transparent: true,
+        opacity: 0.6 - (i * 0.05) // Fade out along trail
+      });
+      const trailParticle1 = new THREE.Mesh(trailGeometry1, trailMaterial1);
+      
+      // Create second trail particle (180deg out of phase)
+      const trailGeometry2 = new THREE.SphereGeometry(0.08, 6, 4);
+      const trailMaterial2 = new THREE.MeshBasicMaterial({ 
+        color: 0x66ff66,
+        transparent: true,
+        opacity: 0.6 - (i * 0.05) // Fade out along trail
+      });
+      const trailParticle2 = new THREE.Mesh(trailGeometry2, trailMaterial2);
+      
+      // Calculate bullet direction for positioning and rotation
+      const bulletDirection = bullet.userData.velocity.clone().normalize();
+      
+      // Position both trail particles behind bullet along its direction
+      trailParticle1.position.copy(bullet.position);
+      trailParticle2.position.copy(bullet.position);
+      const trailOffset = bulletDirection.clone().multiplyScalar(-trailSpacing * (i + 1));
+      trailParticle1.position.add(trailOffset);
+      trailParticle2.position.add(trailOffset);
+      
+      // Add sinuous wave pattern (propagates along trail length)
+      const time = bullet.userData.lifetime * 0.1;
+      const distanceFromBullet = i / (trailLength - 1); // 0 at bullet, 1 at end
+      // Taper only for first 5 pixels (about 0.1 units) from bullet
+      const actualDistanceFromBullet = i * trailSpacing;
+      const sineIntensity = actualDistanceFromBullet < 0.1 ? 0 : Math.pow((actualDistanceFromBullet - 0.1) / 2.0, 2);
+      
+      // Create wave that propagates along the trail (not just time-based)
+      const wavePhase = time * 1.5 - distanceFromBullet * 6; // Slower wave propagation
+      const sine1 = Math.sin(wavePhase) * 0.5 * sineIntensity; // Higher amplitude
+      const sine2 = Math.sin(wavePhase * 2) * 0.25 * sineIntensity; // Higher amplitude
+      
+      // Apply sine waves perpendicular to bullet direction
+      const perpendicular = new THREE.Vector3(-bulletDirection.y, bulletDirection.x, 0);
+      
+      // First trail: normal phase
+      trailParticle1.position.add(perpendicular.clone().multiplyScalar(sine1 + sine2));
+      
+      // Second trail: 180 degrees out of phase
+      trailParticle2.position.add(perpendicular.clone().multiplyScalar(-(sine1 + sine2)));
+      
+      this.scene.add(trailParticle1);
+      this.scene.add(trailParticle2);
+      bullet.userData.trailParticles.push(trailParticle1);
+      bullet.userData.trailParticles.push(trailParticle2);
+    }
+  }
+
+  updateBulletTrail(bullet) {
+    const trailSpacing = 0.3;
+    const time = bullet.userData.lifetime * 0.1;
+    const trailLength = bullet.userData.trailParticles.length / 2; // Divide by 2 since we have 2 trails per position
+    
+    // Calculate bullet direction for rotation
+    const bulletDirection = bullet.userData.velocity.clone().normalize();
+    
+    bullet.userData.trailParticles.forEach((particle, index) => {
+      // Calculate which trail segment this particle belongs to
+      const trailSegment = Math.floor(index / 2);
+      const isFirstTrail = index % 2 === 0;
+      
+      // Update position to follow bullet along its direction
+      particle.position.copy(bullet.position);
+      const trailOffset = bulletDirection.clone().multiplyScalar(-trailSpacing * (trailSegment + 1));
+      particle.position.add(trailOffset);
+      
+      // Add sinuous wave pattern (propagates along trail length)
+      const distanceFromBullet = trailSegment / (trailLength - 1); // 0 at bullet, 1 at end
+      // Taper only for first 5 pixels (about 0.1 units) from bullet
+      const actualDistanceFromBullet = trailSegment * trailSpacing;
+      const sineIntensity = actualDistanceFromBullet < 0.1 ? 0 : Math.pow((actualDistanceFromBullet - 0.1) / 2.0, 2);
+      
+      // Create wave that propagates along the trail (not just time-based)
+      const wavePhase = time * 1.5 - distanceFromBullet * 6; // Slower wave propagation
+      const sine1 = Math.sin(wavePhase) * 0.5 * sineIntensity; // Higher amplitude
+      const sine2 = Math.sin(wavePhase * 2) * 0.25 * sineIntensity; // Higher amplitude
+      
+      // Apply sine waves perpendicular to bullet direction
+      const perpendicular = new THREE.Vector3(-bulletDirection.y, bulletDirection.x, 0);
+      
+      if (isFirstTrail) {
+        // First trail: normal phase
+        particle.position.add(perpendicular.clone().multiplyScalar(sine1 + sine2));
+      } else {
+        // Second trail: 180 degrees out of phase
+        particle.position.add(perpendicular.clone().multiplyScalar(-(sine1 + sine2)));
+      }
+      
+      // Fade out over time
+      const fadeAmount = 0.6 - (trailSegment * 0.05) - (bullet.userData.lifetime * 0.001);
+      particle.material.opacity = Math.max(0, fadeAmount);
+    });
+  }
+
+  cleanupBulletTrail(bullet) {
+    bullet.userData.trailParticles.forEach(particle => {
+      this.scene.remove(particle);
+    });
+    bullet.userData.trailParticles = [];
+  }
+
+  startEnemyWarning(enemy, player) {
+    // Only apply warning for green bullets (level 10-19)
+    if (this.currentLevel < 20) {
+      // Store original color and player reference
+      enemy.userData.originalColor = enemy.material.color.getHex();
+      enemy.userData.targetPlayer = player;
+      // Set warning state
+      enemy.userData.warningActive = true;
+      enemy.userData.warningTime = 0;
+      enemy.userData.warningDuration = 90; // 1.5 seconds at 60fps
+      // Change to green
+      enemy.material.color.setHex(0x66ff66);
+    } else {
+      // For red bullets, shoot immediately
+      this.shootEnemyBullet(enemy, player);
+    }
+  }
+
+  updateEnemyWarnings() {
+    this.enemies.forEach(enemy => {
+      if (enemy.userData.warningActive) {
+        enemy.userData.warningTime++;
+        if (enemy.userData.warningTime >= enemy.userData.warningDuration) {
+          // Warning complete, shoot bullet and restore color
+          this.shootEnemyBullet(enemy, enemy.userData.targetPlayer);
+          this.endEnemyWarning(enemy);
+        }
+      }
+    });
+  }
+
+  endEnemyWarning(enemy) {
+    // Restore original color
+    if (enemy.userData.originalColor !== undefined) {
+      enemy.material.color.setHex(enemy.userData.originalColor);
+    }
+    // Clear warning state
+    enemy.userData.warningActive = false;
+    enemy.userData.warningTime = 0;
+    enemy.userData.originalColor = undefined;
+    enemy.userData.targetPlayer = undefined;
   }
 }
