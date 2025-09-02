@@ -92,7 +92,7 @@ class Game {
     this.engine.init();
     
     // Create enemies after engine is initialized so bounds calculation works
-    this.enemies = new EnemyManager(this.engine.scene, this.currentLevel, this.engine);
+    this.enemies = new EnemyManager(this.engine.scene, this.currentLevel, this.engine, this.audio);
     if (DEBUG) console.log(`EnemyManager created with level ${this.currentLevel}`);
     
     this.setupAudioStart();

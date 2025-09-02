@@ -4,7 +4,7 @@ import { GAME_CONFIG } from '../config/GameConstants.js';
 const DEBUG = false;
 
 export class EnemyManager {
-  constructor(scene, level = 1, gameEngine = null) {
+  constructor(scene, level = 1, gameEngine = null, audioManager = null) {
     this.scene = scene;
     this.enemies = [];
     this.diveCooldown = 0;
@@ -24,6 +24,7 @@ export class EnemyManager {
     this.bulletCooldown = 0;
     this.currentLevel = level;
     this.bulletTrails = []; // Store trail particles for green bullets
+    this.audioManager = audioManager; // Reference to audio manager for sound effects
     
     this.createEnemies(level, gameEngine);
   }
@@ -184,7 +185,7 @@ export class EnemyManager {
     // 3. If it misses, it returns to formation
     if (this.diveCooldown > 0) this.diveCooldown--;
     else if (!divingDisabled && this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed && Math.random() < 0.02) {
-      const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation');
+      const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation' && !e.userData.warningActive);
       if (formationEnemies.length > 0) {
         // Check for formation swooping (enemies close to each other)
         const formationGroups = this.findFormationGroups(formationEnemies);
@@ -555,6 +556,15 @@ export class EnemyManager {
       this.createBulletTrail(bullet);
     }
     
+    // Play appropriate fire sound
+    if (this.audioManager) {
+      if (bullet.userData.isGreen) {
+        this.audioManager.playGreenBulletFire();
+      } else {
+        this.audioManager.playRedBulletFire();
+      }
+    }
+    
     this.scene.add(bullet);
     this.enemyBullets.push(bullet);
   }
@@ -702,20 +712,32 @@ export class EnemyManager {
   }
 
   startEnemyWarning(enemy, player) {
-    // Only apply warning for green bullets (level 10-19)
+    // Store original color and player reference
+    enemy.userData.originalColor = enemy.material.color.getHex();
+    enemy.userData.targetPlayer = player;
+    // Set warning state
+    enemy.userData.warningActive = true;
+    enemy.userData.warningTime = 0;
+    
     if (this.currentLevel < 20) {
-      // Store original color and player reference
-      enemy.userData.originalColor = enemy.material.color.getHex();
-      enemy.userData.targetPlayer = player;
-      // Set warning state
-      enemy.userData.warningActive = true;
-      enemy.userData.warningTime = 0;
+      // Green bullets (level 10-19) - solid green warning
       enemy.userData.warningDuration = 90; // 1.5 seconds at 60fps
+      enemy.userData.warningType = 'green';
       // Change to green
       enemy.material.color.setHex(0x66ff66);
     } else {
-      // For red bullets, shoot immediately
-      this.shootEnemyBullet(enemy, player);
+      // Red bullets (level 20+) - dark red blinking warning
+      enemy.userData.warningDuration = 120; // 2 seconds at 60fps
+      enemy.userData.warningType = 'red';
+      enemy.userData.blinkTimer = 0;
+      enemy.userData.blinkRate = 12; // Blink every 12 frames
+      // Start with dark red
+      enemy.material.color.setHex(0x660000);
+      
+      // Play charge up sound for red bullets
+      if (this.audioManager) {
+        this.audioManager.playRedBulletCharge();
+      }
     }
   }
 
@@ -723,6 +745,21 @@ export class EnemyManager {
     this.enemies.forEach(enemy => {
       if (enemy.userData.warningActive) {
         enemy.userData.warningTime++;
+        
+        // Handle blinking for red bullet warnings
+        if (enemy.userData.warningType === 'red') {
+          enemy.userData.blinkTimer++;
+          if (enemy.userData.blinkTimer >= enemy.userData.blinkRate) {
+            enemy.userData.blinkTimer = 0;
+            // Toggle between dark red and original color
+            if (enemy.material.color.getHex() === 0x660000) {
+              enemy.material.color.setHex(enemy.userData.originalColor);
+            } else {
+              enemy.material.color.setHex(0x660000);
+            }
+          }
+        }
+        
         if (enemy.userData.warningTime >= enemy.userData.warningDuration) {
           // Warning complete, shoot bullet and restore color
           this.shootEnemyBullet(enemy, enemy.userData.targetPlayer);
@@ -740,6 +777,9 @@ export class EnemyManager {
     // Clear warning state
     enemy.userData.warningActive = false;
     enemy.userData.warningTime = 0;
+    enemy.userData.warningType = undefined;
+    enemy.userData.blinkTimer = undefined;
+    enemy.userData.blinkRate = undefined;
     enemy.userData.originalColor = undefined;
     enemy.userData.targetPlayer = undefined;
   }

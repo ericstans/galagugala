@@ -307,6 +307,101 @@ export class AudioManager {
     return [oscillator1, oscillator2];
   }
 
+  createGreenBulletSound() {
+    if (!this.audioContext) return null;
+    
+    // Create a quick, sharp "pew" sound for green bullets
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    
+    oscillator.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Quick frequency sweep from high to mid
+    oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
+    
+    // High-pass filter for a sharp, laser-like sound
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(300, this.audioContext.currentTime);
+    
+    // Quick attack and decay
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.3, this.audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.15);
+    
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.15);
+    
+    return oscillator;
+  }
+
+  createRedBulletChargeSound() {
+    if (!this.audioContext) return null;
+    
+    // Create a building "charge up" sound for red bullets
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    
+    oscillator.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Rising frequency for charge effect - starts 1 second later, lasts 1 second
+    oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime + 1.0);
+    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 2.0);
+    
+    // Low-pass filter that opens up during charge
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, this.audioContext.currentTime + 1.0);
+    filter.frequency.exponentialRampToValueAtTime(1200, this.audioContext.currentTime + 2.0);
+    
+    // Building volume with slight tremolo effect
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 1.0);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.2, this.audioContext.currentTime + 1.1);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.4, this.audioContext.currentTime + 2.0);
+    
+    oscillator.start(this.audioContext.currentTime + 1.0);
+    oscillator.stop(this.audioContext.currentTime + 2.0);
+    
+    return oscillator;
+  }
+
+  createRedBulletFireSound() {
+    if (!this.audioContext) return null;
+    
+    // Create a powerful "boom" sound for red bullet firing
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    
+    oscillator.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Sharp frequency drop for impact
+    oscillator.frequency.setValueAtTime(600, this.audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.2);
+    
+    // Low-pass filter for a deep, powerful sound
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, this.audioContext.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(200, this.audioContext.currentTime + 0.2);
+    
+    // Sharp attack with quick decay
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.5, this.audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+    
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.3);
+    
+    return oscillator;
+  }
+
   // Background ambient sound
   createBackgroundSound() {
     if (!this.audioContext) return null;
@@ -372,6 +467,21 @@ export class AudioManager {
   playChainBreak() {
     if (!this.audioContext) return;
     this.createChainBreakSound();
+  }
+
+  playGreenBulletFire() {
+    if (!this.audioContext) return;
+    this.createGreenBulletSound();
+  }
+
+  playRedBulletCharge() {
+    if (!this.audioContext) return;
+    this.createRedBulletChargeSound();
+  }
+
+  playRedBulletFire() {
+    if (!this.audioContext) return;
+    this.createRedBulletFireSound();
   }
 
   startBackgroundSound() {
