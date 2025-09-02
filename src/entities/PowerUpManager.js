@@ -170,16 +170,25 @@ export class PowerUpManager {
       // Handle different power-up types
       const powerUpType = powerUp.userData.type;
       if (powerUpType === 'red') {
-        console.log('Red power-up collected! (Wing upgrade)');
+        console.log('Red power-up collected! (Both wings upgrade)');
         
-        // Determine which wing to add/repair
-        const missingWing = player.getMissingWing();
-        if (missingWing) {
-          player.addWing(missingWing);
-          return { type: 'red', wingAdded: missingWing };
+        // Add both wings if missing
+        let wingsAdded = [];
+        if (!player.leftWing || player.leftWing.userData.isDestroyed) {
+          player.addWing('left');
+          wingsAdded.push('left');
+        }
+        if (!player.rightWing || player.rightWing.userData.isDestroyed) {
+          player.addWing('right');
+          wingsAdded.push('right');
+        }
+        
+        if (wingsAdded.length > 0) {
+          console.log(`Wings added: ${wingsAdded.join(', ')}`);
+          return { type: 'red', wingsAdded: wingsAdded };
         } else {
           console.log('Player already has both wings!');
-          return { type: 'red', wingAdded: null };
+          return { type: 'red', wingsAdded: [] };
         }
       } else {
         console.log('Blue power-up collected! (Standard effect)');

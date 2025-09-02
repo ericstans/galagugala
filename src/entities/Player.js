@@ -113,14 +113,46 @@ export class Player {
   }
 
   addWing(side) {
-    if (side === 'left' && !this.leftWing) {
-      this.leftWing = this.createWing('left');
-      console.log('Left wing added!');
-    } else if (side === 'right' && !this.rightWing) {
-      this.rightWing = this.createWing('right');
-      console.log('Right wing added!');
+    if (side === 'left') {
+      if (!this.leftWing) {
+        // Create new left wing
+        this.leftWing = this.createWing('left');
+        console.log('Left wing added!');
+      } else if (this.leftWing.userData.isDestroyed) {
+        // Repair destroyed left wing
+        this.repairWing(this.leftWing);
+        console.log('Left wing repaired!');
+      }
+    } else if (side === 'right') {
+      if (!this.rightWing) {
+        // Create new right wing
+        this.rightWing = this.createWing('right');
+        console.log('Right wing added!');
+      } else if (this.rightWing.userData.isDestroyed) {
+        // Repair destroyed right wing
+        this.repairWing(this.rightWing);
+        console.log('Right wing repaired!');
+      }
     } else {
-      console.log(`Cannot add ${side} wing - already exists or invalid side`);
+      console.log(`Cannot add ${side} wing - already exists and not destroyed`);
+    }
+  }
+
+  repairWing(wing) {
+    if (wing && wing.userData.isDestroyed) {
+      wing.userData.isDestroyed = false;
+      
+      // Restore original wing appearance
+      wing.traverse((child) => {
+        if (child.material) {
+          // Restore original cyan color
+          child.material.color.setHex(0x00fffc);
+          child.material.transparent = false;
+          child.material.opacity = 1.0;
+        }
+      });
+      
+      console.log(`${wing.userData.side} wing repaired - restored original appearance`);
     }
   }
 
@@ -217,26 +249,48 @@ export class Player {
     const bulletGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8);
     const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff8800 });
     
-    // Shoot from left wing
+    // Shoot from left wing gun
     if (this.leftWing && !this.leftWing.userData.isDestroyed) {
       const leftBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
-      const leftWingWorldPos = new THREE.Vector3();
-      this.leftWing.getWorldPosition(leftWingWorldPos);
-      leftBullet.position.copy(leftWingWorldPos);
-      leftBullet.position.y += 0.5;
-      this.scene.add(leftBullet);
-      this.wingBullets.push(leftBullet);
+      
+      // Find the gun mesh within the left wing
+      let leftGun = null;
+      this.leftWing.traverse((child) => {
+        if (child.geometry && child.geometry.type === 'CylinderGeometry') {
+          leftGun = child;
+        }
+      });
+      
+      if (leftGun) {
+        const leftGunWorldPos = new THREE.Vector3();
+        leftGun.getWorldPosition(leftGunWorldPos);
+        leftBullet.position.copy(leftGunWorldPos);
+        leftBullet.position.y += 0.3; // Small offset to start from gun tip
+        this.scene.add(leftBullet);
+        this.wingBullets.push(leftBullet);
+      }
     }
     
-    // Shoot from right wing
+    // Shoot from right wing gun
     if (this.rightWing && !this.rightWing.userData.isDestroyed) {
       const rightBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
-      const rightWingWorldPos = new THREE.Vector3();
-      this.rightWing.getWorldPosition(rightWingWorldPos);
-      rightBullet.position.copy(rightWingWorldPos);
-      rightBullet.position.y += 0.5;
-      this.scene.add(rightBullet);
-      this.wingBullets.push(rightBullet);
+      
+      // Find the gun mesh within the right wing
+      let rightGun = null;
+      this.rightWing.traverse((child) => {
+        if (child.geometry && child.geometry.type === 'CylinderGeometry') {
+          rightGun = child;
+        }
+      });
+      
+      if (rightGun) {
+        const rightGunWorldPos = new THREE.Vector3();
+        rightGun.getWorldPosition(rightGunWorldPos);
+        rightBullet.position.copy(rightGunWorldPos);
+        rightBullet.position.y += 0.3; // Small offset to start from gun tip
+        this.scene.add(rightBullet);
+        this.wingBullets.push(rightBullet);
+      }
     }
     
     this.canShootWings = false;
@@ -246,7 +300,19 @@ export class Player {
   destroyWing(wing) {
     if (wing) {
       wing.userData.isDestroyed = true;
-      this.scene.remove(wing);
+      
+      // Change wing appearance to show it's destroyed
+      wing.traverse((child) => {
+        if (child.material) {
+          // Make the wing appear damaged/destroyed
+          child.material.color.setHex(0x333333); // Dark gray
+          child.material.transparent = true;
+          child.material.opacity = 0.3; // Make it semi-transparent
+        }
+      });
+      
+      // Don't remove from scene - keep it visible but damaged
+      console.log(`${wing.userData.side} wing destroyed - showing damaged appearance`);
     }
   }
 

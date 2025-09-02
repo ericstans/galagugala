@@ -124,8 +124,8 @@ class Game {
       const powerUpResult = this.powerUps.checkCollisions(this.player, this.audio);
       if (powerUpResult) {
         // Handle wing upgrades
-        if (powerUpResult.type === 'red' && powerUpResult.wingAdded) {
-          console.log(`Wing upgrade: ${powerUpResult.wingAdded} wing added!`);
+        if (powerUpResult.type === 'red' && powerUpResult.wingsAdded && powerUpResult.wingsAdded.length > 0) {
+          console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
         }
       }
     }
@@ -192,9 +192,9 @@ class Game {
       this.engine.setGameState({ explosionComplete: true });
       this.audio.playGameOver();
       this.overlay.showOverlay('Game Over');
-      return;
-    }
-    
+    return;
+  }
+
     // Win condition (only if game is still playing)
     if (this.enemies.enemies.length === 0 && gameState.isPlaying) {
       this.audio.playWin();
