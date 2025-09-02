@@ -80,10 +80,10 @@ export class PowerUpManager {
       type: type // Store power-up type
     };
     
-    if (debug) console.log(`${type} power-up created at position:`, powerUp.position);
+    if (DEBUG) console.log(`${type} power-up created at position:`, powerUp.position);
     this.scene.add(powerUp);
     this.powerUps.push(powerUp);
-    if (debug) console.log('Total power-ups:', this.powerUps.length);
+    if (DEBUG) console.log('Total power-ups:', this.powerUps.length);
     return powerUp;
   }
 
@@ -128,12 +128,12 @@ export class PowerUpManager {
       
       // Debug: log position occasionally
       if (Math.floor(powerUp.userData.pulseTime * 10) % 60 === 0) {
-        if (debug) console.log('Power-up at y:', powerUp.position.y);
+        if (DEBUG) console.log('Power-up at y:', powerUp.position.y);
       }
       
       // Remove if fallen off screen
       if (powerUp.position.y < -8) {
-        if (debug) console.log('Power-up removed (fell off screen)');
+        if (DEBUG) console.log('Power-up removed (fell off screen)');
         
         // Reset chain if blue power-up falls off screen
         if (powerUp.userData.type === 'blue') {
@@ -258,7 +258,7 @@ export class PowerUpManager {
 
   // Spawn power-up when a column is destroyed
   spawnPowerUpOnColumnDestroyed(player, position = null) {
-    if (debug) console.log('Column destroyed! Spawning power-up...');
+    if (DEBUG) console.log('Column destroyed! Spawning power-up...');
     
     // Determine power-up type based on player's wing status
     let powerUpType;
@@ -267,7 +267,7 @@ export class PowerUpManager {
     if (hasBoth) {
       // Player has both wings, only spawn blue power-ups
       powerUpType = 'blue';
-      if (debug) console.log('Player has both wings, spawning blue power-up');
+      if (DEBUG) console.log('Player has both wings, spawning blue power-up');
     } else {
       // Player missing wings, can spawn red power-ups
       const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
@@ -277,10 +277,10 @@ export class PowerUpManager {
       
       if (shouldSpawnRed && !hasRedPowerUp) {
         powerUpType = 'red';
-        if (debug) console.log('Spawning red power-up (no red power-up on screen)');
+        if (DEBUG) console.log('Spawning red power-up (no red power-up on screen)');
       } else {
         powerUpType = 'blue';
-        if (debug) {
+        if (DEBUG) {
           if (hasRedPowerUp) {
             console.log('Spawning blue power-up (red power-up already on screen)');
           } else {
