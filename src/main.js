@@ -865,7 +865,7 @@ class Game {
           setTimeout(() => {
             this.proceedToNextLevel();
           }, 2000);
-        }, 1000); // Continue arp for 1 second after power-ups end
+        }, 2500); // Continue arp for 2.5 second after power-ups end
       }
     };
     
