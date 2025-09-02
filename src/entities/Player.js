@@ -16,6 +16,21 @@ export class Player {
     this.wingBullets = [];
     this.canShootWings = true;
     
+    // Jet engines
+    this.leftEngine = null;
+    this.rightEngine = null;
+    this.leftEngineParticles = null;
+    this.rightEngineParticles = null;
+    this.particleSystems = [];
+    
+    // Flame delay system
+    this.leftEngineFlameDelay = 0;
+    this.rightEngineFlameDelay = 0;
+    this.flameDelayFrames = 10; // Continue flames for 10 frames after stopping
+    
+    // Create jet engines after particleSystems is initialized
+    this.createJetEngines();
+    
     // Invulnerability system
     this.isInvulnerable = false;
     this.invulnerabilityFlashTimer = 0;
@@ -78,17 +93,251 @@ export class Player {
   }
 
   createCockpit() {
-    const cockpitGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16);
+    // Simple triangular cockpit as part of the ship body
+    const cockpitGeometry = new THREE.ConeGeometry(0.15, 0.25, 3, 1, true);
     const cockpitMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0x0011ff, 
-      transparent: true, 
-      opacity: 0.7 
+      color: 0x0011ff,
+      transparent: true,
+      opacity: 0.6
     });
     const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-    cockpit.rotation.x = Math.PI / 2; // Rotate to be horizontal
-    cockpit.position.set(0, 0, 0.06); // Position relative to ship center
-    this.mesh.add(cockpit); // Add cockpit as child of player ship
+    cockpit.position.set(0, -0.2, 0.125); // Move toward the front of the ship (negative Y)
+    cockpit.rotation.x = Math.PI; // Face upward
+    
+    this.mesh.add(cockpit);
     return cockpit;
+  }
+
+  createJetEngines() {
+    // Left engine
+    const leftEngineGeometry = new THREE.CylinderGeometry(0.03, 0.05, 0.15, 8);
+    const engineMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    this.leftEngine = new THREE.Mesh(leftEngineGeometry, engineMaterial);
+    this.leftEngine.position.set(-0.15, 0.3, 0.05); // Back of ship, left side (positive Y is back since ship is rotated)
+    this.leftEngine.rotation.x = Math.PI / 2; // Point backward along Y axis
+    this.mesh.add(this.leftEngine);
+
+    // Right engine
+    const rightEngineGeometry = new THREE.CylinderGeometry(0.03, 0.05, 0.15, 8);
+    this.rightEngine = new THREE.Mesh(rightEngineGeometry, engineMaterial);
+    this.rightEngine.position.set(0.15, 0.3, 0.05); // Back of ship, right side (positive Y is back since ship is rotated)
+    this.rightEngine.rotation.x = Math.PI / 2; // Point backward along Y axis
+    this.mesh.add(this.rightEngine);
+
+    // Create particle systems for thrust
+    this.createEngineParticles();
+  }
+
+  createEngineParticles() {
+    // Left engine particles
+    const leftParticleGeometry = new THREE.BufferGeometry();
+    const leftParticleCount = 100;
+    const leftPositions = new Float32Array(leftParticleCount * 3);
+    const leftVelocities = new Float32Array(leftParticleCount * 3);
+    const leftLifetimes = new Float32Array(leftParticleCount);
+    
+    for (let i = 0; i < leftParticleCount; i++) {
+      leftPositions[i * 3] = 0; // x
+      leftPositions[i * 3 + 1] = 0; // y
+      leftPositions[i * 3 + 2] = 0; // z
+      
+      leftVelocities[i * 3] = 0; // x velocity
+      leftVelocities[i * 3 + 1] = 0; // y velocity
+      leftVelocities[i * 3 + 2] = 0; // z velocity
+      
+      leftLifetimes[i] = 0; // particle lifetime
+    }
+    
+    leftParticleGeometry.setAttribute('position', new THREE.BufferAttribute(leftPositions, 3));
+    leftParticleGeometry.setAttribute('velocity', new THREE.BufferAttribute(leftVelocities, 3));
+    leftParticleGeometry.setAttribute('lifetime', new THREE.BufferAttribute(leftLifetimes, 1));
+    
+    const leftParticleMaterial = new THREE.PointsMaterial({
+      color: 0xff4400,
+      size: 0.03,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    this.leftEngineParticles = new THREE.Points(leftParticleGeometry, leftParticleMaterial);
+    this.leftEngineParticles.position.set(-0.15, 0.3, 0.05);
+    this.scene.add(this.leftEngineParticles);
+
+    // Right engine particles
+    const rightParticleGeometry = new THREE.BufferGeometry();
+    const rightParticleCount = 100;
+    const rightPositions = new Float32Array(rightParticleCount * 3);
+    const rightVelocities = new Float32Array(rightParticleCount * 3);
+    const rightLifetimes = new Float32Array(rightParticleCount);
+    
+    for (let i = 0; i < rightParticleCount; i++) {
+      rightPositions[i * 3] = 0; // x
+      rightPositions[i * 3 + 1] = 0; // y
+      rightPositions[i * 3 + 2] = 0; // z
+      
+      rightVelocities[i * 3] = 0; // x velocity
+      rightVelocities[i * 3 + 1] = 0; // y velocity
+      rightVelocities[i * 3 + 2] = 0; // z velocity
+      
+      rightLifetimes[i] = 0; // particle lifetime
+    }
+    
+    rightParticleGeometry.setAttribute('position', new THREE.BufferAttribute(rightPositions, 3));
+    rightParticleGeometry.setAttribute('velocity', new THREE.BufferAttribute(rightVelocities, 3));
+    rightParticleGeometry.setAttribute('lifetime', new THREE.BufferAttribute(rightLifetimes, 1));
+    
+    const rightParticleMaterial = new THREE.PointsMaterial({
+      color: 0xff4400,
+      size: 0.03,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    this.rightEngineParticles = new THREE.Points(rightParticleGeometry, rightParticleMaterial);
+    this.rightEngineParticles.position.set(0.15, 0.3, 0.05);
+    this.scene.add(this.rightEngineParticles);
+
+    this.particleSystems.push(this.leftEngineParticles, this.rightEngineParticles);
+  }
+
+  updateEngineParticles(velocityX) {
+    if (!this.leftEngineParticles || !this.rightEngineParticles) return;
+
+    const leftPositions = this.leftEngineParticles.geometry.attributes.position.array;
+    const rightPositions = this.rightEngineParticles.geometry.attributes.position.array;
+    const leftVelocities = this.leftEngineParticles.geometry.attributes.velocity.array;
+    const rightVelocities = this.rightEngineParticles.geometry.attributes.velocity.array;
+    const leftLifetimes = this.leftEngineParticles.geometry.attributes.lifetime.array;
+    const rightLifetimes = this.rightEngineParticles.geometry.attributes.lifetime.array;
+
+    // Update particle system positions to follow the ship
+    this.leftEngineParticles.position.copy(this.mesh.position);
+    this.leftEngineParticles.position.x -= 0.15;
+    this.leftEngineParticles.position.y -= 0.3; // Changed to negative Y (bottom of screen)
+    this.leftEngineParticles.position.z += 0.05;
+
+    this.rightEngineParticles.position.copy(this.mesh.position);
+    this.rightEngineParticles.position.x += 0.15;
+    this.rightEngineParticles.position.y -= 0.3; // Changed to negative Y (bottom of screen)
+    this.rightEngineParticles.position.z += 0.05;
+
+    // Update flame delay timers
+    if (velocityX > 0) {
+      this.leftEngineFlameDelay = this.flameDelayFrames; // Reset delay timer
+    } else {
+      this.leftEngineFlameDelay = Math.max(0, this.leftEngineFlameDelay - 1); // Decrease delay
+    }
+
+    if (velocityX < 0) {
+      this.rightEngineFlameDelay = this.flameDelayFrames; // Reset delay timer
+    } else {
+      this.rightEngineFlameDelay = Math.max(0, this.rightEngineFlameDelay - 1); // Decrease delay
+    }
+
+    // Update left engine particles (thrust when moving right or during delay)
+    if (velocityX > 0 || this.leftEngineFlameDelay > 0) {
+      for (let i = 0; i < leftPositions.length; i += 3) {
+        const particleIndex = i / 3;
+        
+        // If particle is dead or too far, respawn it
+        if (leftLifetimes[particleIndex] <= 0 || leftPositions[i + 1] < -0.5) {
+          // Spawn new particle at engine position
+          leftPositions[i] = (Math.random() - 0.5) * 0.03; // Random X spread
+          leftPositions[i + 1] = 0; // Start at engine
+          leftPositions[i + 2] = (Math.random() - 0.5) * 0.03; // Random Z spread
+          
+          // Set initial velocity (shooting away from enemies)
+          leftVelocities[i] = (Math.random() - 0.5) * 0.02; // Small X drift
+          leftVelocities[i + 1] = -(0.15 + Math.random() * 0.08); // Strong thrust away from enemies (negative Y)
+          leftVelocities[i + 2] = (Math.random() - 0.5) * 0.02; // Small Z drift
+          
+          leftLifetimes[particleIndex] = 1.0; // Full lifetime
+        } else {
+          // Update existing particle
+          leftPositions[i] += leftVelocities[i];
+          leftPositions[i + 1] += leftVelocities[i + 1];
+          leftPositions[i + 2] += leftVelocities[i + 2];
+          
+          // Decay velocity (flame spreads out)
+          leftVelocities[i] *= 0.99;
+          leftVelocities[i + 1] *= 0.97;
+          leftVelocities[i + 2] *= 0.99;
+          
+          // Decrease lifetime
+          leftLifetimes[particleIndex] -= 0.02;
+        }
+      }
+    } else {
+      // No thrust - fade all particles
+      for (let i = 0; i < leftPositions.length; i += 3) {
+        const particleIndex = i / 3;
+        if (leftLifetimes[particleIndex] > 0) {
+          leftLifetimes[particleIndex] -= 0.05; // Faster fade when not thrusting
+          // Move particles while fading
+          leftPositions[i] += leftVelocities[i];
+          leftPositions[i + 1] += leftVelocities[i + 1];
+          leftPositions[i + 2] += leftVelocities[i + 2];
+          // Decay velocity
+          leftVelocities[i] *= 0.95;
+          leftVelocities[i + 1] *= 0.95;
+          leftVelocities[i + 2] *= 0.95;
+        }
+      }
+    }
+
+    // Update right engine particles (thrust when moving left or during delay)
+    if (velocityX < 0 || this.rightEngineFlameDelay > 0) {
+      for (let i = 0; i < rightPositions.length; i += 3) {
+        const particleIndex = i / 3;
+        
+        // If particle is dead or too far, respawn it
+        if (rightLifetimes[particleIndex] <= 0 || rightPositions[i + 1] < -0.5) {
+          // Spawn new particle at engine position
+          rightPositions[i] = (Math.random() - 0.5) * 0.03; // Random X spread
+          rightPositions[i + 1] = 0; // Start at engine
+          rightPositions[i + 2] = (Math.random() - 0.5) * 0.03; // Random Z spread
+          
+          // Set initial velocity (shooting away from enemies)
+          rightVelocities[i] = (Math.random() - 0.5) * 0.02; // Small X drift
+          rightVelocities[i + 1] = -(0.15 + Math.random() * 0.08); // Strong thrust away from enemies (negative Y)
+          rightVelocities[i + 2] = (Math.random() - 0.5) * 0.02; // Small Z drift
+          
+          rightLifetimes[particleIndex] = 1.0; // Full lifetime
+        } else {
+          // Update existing particle
+          rightPositions[i] += rightVelocities[i];
+          rightPositions[i + 1] += rightVelocities[i + 1];
+          rightPositions[i + 2] += rightVelocities[i + 2];
+          
+          // Decay velocity (flame spreads out)
+          rightVelocities[i] *= 0.99;
+          rightVelocities[i + 1] *= 0.97;
+          rightVelocities[i + 2] *= 0.99;
+          
+          // Decrease lifetime
+          rightLifetimes[particleIndex] -= 0.02;
+        }
+      }
+    } else {
+      // No thrust - fade all particles
+      for (let i = 0; i < rightPositions.length; i += 3) {
+        const particleIndex = i / 3;
+        if (rightLifetimes[particleIndex] > 0) {
+          rightLifetimes[particleIndex] -= 0.05; // Faster fade when not thrusting
+          // Move particles while fading
+          rightPositions[i] += rightVelocities[i];
+          rightPositions[i + 1] += rightVelocities[i + 1];
+          rightPositions[i + 2] += rightVelocities[i + 2];
+          // Decay velocity
+          rightVelocities[i] *= 0.95;
+          rightVelocities[i + 1] *= 0.95;
+          rightVelocities[i + 2] *= 0.95;
+        }
+      }
+    }
+
+    this.leftEngineParticles.geometry.attributes.position.needsUpdate = true;
+    this.rightEngineParticles.geometry.attributes.position.needsUpdate = true;
   }
 
   createWing(side) {
@@ -182,14 +431,18 @@ export class Player {
   }
 
   update(inputManager, gameState) {
+    let velocityX = 0;
+    
     // Player movement (only if not destroyed)
     if (gameState.isPlaying && !gameState.playerDestroyed) {
       if (inputManager.isLeftPressed()) {
         this.mesh.position.x -= GAME_CONFIG.PLAYER_SPEED;
+        velocityX = -GAME_CONFIG.PLAYER_SPEED;
         if (this.mesh.position.x < -6) this.mesh.position.x = -6;
       }
       if (inputManager.isRightPressed()) {
         this.mesh.position.x += GAME_CONFIG.PLAYER_SPEED;
+        velocityX = GAME_CONFIG.PLAYER_SPEED;
         if (this.mesh.position.x > 6) this.mesh.position.x = 6;
       }
       if (inputManager.isShootPressed()) {
@@ -229,9 +482,12 @@ export class Player {
       }
     }
 
-    // Update invulnerability flash effect
+        // Update invulnerability flash effect
     this.updateInvulnerabilityFlash();
-
+    
+    // Update engine particle effects
+    this.updateEngineParticles(velocityX);
+    
     return null;
   }
 
