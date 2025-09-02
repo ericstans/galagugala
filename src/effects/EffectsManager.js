@@ -345,8 +345,28 @@ export class EffectsManager {
     this.gameOverText = textGroup;
   }
 
+  generateRandomTitle() {
+    // Generate random title: GA + 3 random selections from ('GA', 'GU', 'LA', 'LU') + LA
+    const options = ['GA', 'GU', 'LA', 'LU'];
+    const randomSelections = [];
+    
+    // Pick 3 random selections with duplicates allowed
+    for (let i = 0; i < 3; i++) {
+      const randomIndex = Math.floor(Math.random() * options.length);
+      randomSelections.push(options[randomIndex]);
+    }
+    
+    // Combine: GA + random selections + LA
+    const title = 'GA' + randomSelections.join('') + 'LA';
+    console.log(`Generated random title: ${title}`);
+    return title;
+  }
+
   createIntroText() {
-    // Create "GALAGUGALA" text using the same style as GAME OVER
+    // Generate random title
+    const title = this.generateRandomTitle();
+    
+    // Create title text using the same style as GAME OVER
     const textGroup = new THREE.Group();
     
     // Create box geometry and material for letters (same as GAME OVER)
@@ -399,21 +419,15 @@ export class EffectsManager {
     };
     
     // Create each letter with proper centering
-    // Total width is approximately 9 units (10 letters + 9 spaces)
-    // Center offset: -4.5 to center the text
-    const centerOffset = -4.75;
+    // Calculate center offset based on title length
+    const titleLength = title.length;
+    const centerOffset = -(titleLength * 0.5) + 0.5;
     
-    // "GALAGUGALA" - all letters
-    textGroup.add(createLetter('G', centerOffset + 0, 0));
-    textGroup.add(createLetter('A', centerOffset + 1, 0));
-    textGroup.add(createLetter('L', centerOffset + 2, 0));
-    textGroup.add(createLetter('A', centerOffset + 3, 0));
-    textGroup.add(createLetter('G', centerOffset + 4, 0));
-    textGroup.add(createLetter('U', centerOffset + 5, 0));
-    textGroup.add(createLetter('G', centerOffset + 6, 0));
-    textGroup.add(createLetter('A', centerOffset + 7, 0));
-    textGroup.add(createLetter('L', centerOffset + 8, 0));
-    textGroup.add(createLetter('A', centerOffset + 9, 0));
+    // Create letters for the generated title
+    for (let i = 0; i < titleLength; i++) {
+      const letter = title[i];
+      textGroup.add(createLetter(letter, centerOffset + i, 0));
+    }
     
     // Center the text group on the canvas
     textGroup.position.set(0, 0, 0);

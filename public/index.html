@@ -2,12 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>My first three.js app</title>
+    <title id="page-title">Loading...</title>
     <style>
       body { margin: 0; }
     </style>
   </head>
   <body>
+  <script>
+    // Generate random title for page title
+    function generateRandomTitle() {
+      const options = ['GA', 'GU', 'LA', 'LU'];
+      const randomSelections = [];
+      
+      // Pick 3 random selections with duplicates allowed
+      for (let i = 0; i < 3; i++) {
+        const randomIndex = Math.floor(Math.random() * options.length);
+        randomSelections.push(options[randomIndex]);
+      }
+      
+      // Combine: GA + random selections + LA
+      return 'GA' + randomSelections.join('') + 'LA';
+    }
+    
+    // Set the page title
+    document.getElementById('page-title').textContent = generateRandomTitle();
+  </script>
   <script type="module" src="/src/main.js"></script>
   </body>
 </html>
