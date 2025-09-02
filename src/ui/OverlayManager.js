@@ -5,6 +5,7 @@ export class OverlayManager {
     this.startOverlay = this.createStartOverlay();
     this.scoreDisplay = this.createScoreDisplay();
     this.levelDisplay = this.createLevelDisplay();
+    this.livesDisplay = this.createLivesDisplay();
     this.chainFadeTimeout = null; // Track fade-out timeout
     this.lastChainCount = 0; // Track previous chain count to detect breaks
     this.chainBrokenAnimating = false; // Track if "CHAIN BROKEN" is currently animating
@@ -129,6 +130,30 @@ export class OverlayManager {
       document.body.appendChild(levelDisplay);
     }
     return levelDisplay;
+  }
+
+  createLivesDisplay() {
+    let livesDisplay = document.getElementById('lives-display');
+    if (!livesDisplay) {
+      livesDisplay = document.createElement('div');
+      livesDisplay.id = 'lives-display';
+      livesDisplay.style.position = 'fixed';
+      livesDisplay.style.top = '100px'; // Below the level display
+      livesDisplay.style.right = '20px';
+      livesDisplay.style.fontSize = '1.2rem';
+      livesDisplay.style.fontWeight = 'bold';
+      livesDisplay.style.color = '#ff4444';
+      livesDisplay.style.fontFamily = 'Courier New, monospace';
+      livesDisplay.style.textAlign = 'right';
+      livesDisplay.style.textShadow = '0 0 10px #ff4444, 0 0 20px #ff4444';
+      livesDisplay.style.zIndex = '400'; // Same as other displays
+      livesDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
+      livesDisplay.style.userSelect = 'none';
+      livesDisplay.style.display = 'none'; // Initially hidden
+      livesDisplay.innerHTML = '❤️ ❤️ ❤️'; // 3 heart icons
+      document.body.appendChild(livesDisplay);
+    }
+    return livesDisplay;
   }
 
   createStartOverlay() {
@@ -396,6 +421,22 @@ export class OverlayManager {
 
   updateLevel(level) {
     this.levelDisplay.textContent = `LEVEL ${level}`;
+  }
+
+  // Lives display methods
+  showLives() {
+    this.livesDisplay.style.display = 'block';
+  }
+
+  hideLives() {
+    this.livesDisplay.style.display = 'none';
+  }
+
+  updateLives(lives) {
+    // Create heart icons based on remaining lives (show one fewer than actual)
+    const displayLives = Math.max(0, lives - 1);
+    const hearts = '❤️'.repeat(displayLives);
+    this.livesDisplay.innerHTML = hearts;
   }
 
   updateScore(score) {

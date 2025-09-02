@@ -139,7 +139,18 @@ export class EnemyManager {
     });
   }
 
-  update(player, gameState, audioManager) {
+  updateWaveMotionOnly() {
+    // Only update the wave motion for formation enemies (no diving/swooping)
+    this.enemies.forEach(enemy => {
+      if (enemy.userData.state === 'formation') {
+        // Small wiggle for life
+        enemy.position.x = enemy.userData.formationX + Math.sin(Date.now() * 0.001 + enemy.userData.formationY) * 0.1;
+        enemy.position.y = enemy.userData.formationY + Math.cos(Date.now() * 0.001 + enemy.userData.formationX) * 0.05;
+      }
+    });
+  }
+
+  update(player, gameState, audioManager, divingDisabled = false) {
     // Game start timer
     if (gameState.isPlaying && !gameState.playerDestroyed) {
       this.gameStartTimer++;
@@ -150,7 +161,7 @@ export class EnemyManager {
     // 2. Occasionally, one enemy dives toward the player in a curve (after 3 second delay)
     // 3. If it misses, it returns to formation
     if (this.diveCooldown > 0) this.diveCooldown--;
-    else if (this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed && Math.random() < 0.02) {
+    else if (!divingDisabled && this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed && Math.random() < 0.02) {
       const formationEnemies = this.enemies.filter(e => e.userData.state === 'formation');
       if (formationEnemies.length > 0) {
         // Check for formation swooping (enemies close to each other)

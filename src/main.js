@@ -30,6 +30,13 @@ class Game {
     // Score tracking
     this.score = 0;
     
+    // Lives system (player starts with 3 lives: 2 extra)
+    this.lives = 3;
+    this.livesDecremented = false; // Flag to prevent double decrementing
+    this.respawnDelay = 0; // Delay before respawning (in seconds)
+    this.enemyPauseDelay = 0; // Delay before enemies start moving again (in seconds)
+    this.enemyDiveDelay = 0; // Delay before enemies start diving after respawn (in seconds)
+    
     this.enemies = null; // Will be created after engine initialization
     this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
@@ -175,10 +182,12 @@ class Game {
         // Set keyboard focus to the game canvas
         this.engine.renderer.domElement.focus();
         
-        // Show score and level displays
+        // Show score, level, and lives displays
         this.overlay.showScore();
         this.overlay.showLevel();
+        this.overlay.showLives();
         this.overlay.updateLevel(this.currentLevel);
+        this.overlay.updateLives(this.lives);
         
         this.gameStarted = true;
         if (DEBUG) console.log('Game started!');
@@ -211,6 +220,43 @@ class Game {
     
     const gameState = this.engine.getGameState();
     
+    // Handle enemy pause and respawn delays
+    if (this.enemyPauseDelay > 0) {
+      this.enemyPauseDelay -= 1/60; // Assuming 60 FPS
+    }
+    
+    if (this.enemyDiveDelay > 0) {
+      this.enemyDiveDelay -= 1/60; // Assuming 60 FPS
+    }
+    
+    if (this.respawnDelay > 0) {
+      this.respawnDelay -= 1/60; // Assuming 60 FPS
+      if (this.respawnDelay <= 0) {
+        this.respawnPlayer();
+        // Set 2-second delay before enemies can start diving again
+        this.enemyDiveDelay = 2.0;
+      }
+      
+      // Always update effects (explosions, particles, etc.)
+      const effectsResult = this.effects.update();
+      
+      // During respawn delay, update enemies with limited functionality
+      if (this.enemies) {
+        if (this.enemyPauseDelay <= 0) {
+          // Enemy pause is over - full enemy update (they can move again)
+          this.enemies.update(this.player, gameState, this.audio, this.enemyDiveDelay > 0);
+        } else {
+          // Enemy pause is active - only update wave motion, no diving/swooping
+          this.enemies.updateWaveMotionOnly();
+        }
+      }
+      
+      // Update score popups
+      this.overlay.updateScorePopups();
+      
+      return; // Don't update other game logic during respawn delay
+    }
+    
     // Update player
     const playerResult = this.player.update(this.input, gameState, this.engine);
     if (playerResult && playerResult.manualPowerUp) {
@@ -222,7 +268,7 @@ class Game {
     
     // Update enemies
     if (this.enemies) {
-      this.enemies.update(this.player, gameState, this.audio);
+      this.enemies.update(this.player, gameState, this.audio, this.enemyDiveDelay > 0);
     }
     
     // Update power-ups
@@ -419,23 +465,54 @@ class Game {
     // Handle explosion completion
     if (completedExplosion && gameState.playerDestroyed && !gameState.explosionComplete) {
       this.engine.setGameState({ explosionComplete: true });
-      if (DEBUG) console.log('Player destroyed! Starting Game Over animation...');
-      this.audio.playGameOver();
-      this.audio.createRobotSpeech("GAME OVER");
-      this.effects.startGameOverAnimation();
-      // Hide chain display on game over
-      this.overlay.hideChainOnGameOver();
+      
+      // Decrement lives (only once)
+      if (!this.livesDecremented) {
+        this.lives--;
+        this.livesDecremented = true;
+        this.overlay.updateLives(this.lives);
+      }
+      
+      if (this.lives <= 0) {
+        // No lives left - game over
+        if (DEBUG) console.log('No lives left! Starting Game Over animation...');
+        this.audio.playGameOver();
+        this.audio.createRobotSpeech("GAME OVER");
+        this.effects.startGameOverAnimation();
+        // Hide chain display on game over
+        this.overlay.hideChainOnGameOver();
+      } else {
+        // Still have lives - start enemy pause and respawn delays
+        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting 3-second enemy pause, then 2-second respawn delay...`);
+        this.enemyPauseDelay = 3.0; // 3 seconds of enemy pause
+        this.respawnDelay = 5.0; // 5 seconds total (3 + 2) before respawn
+      }
       return;
     }
     
     // Fallback: Start Game Over animation immediately if player is destroyed
     if (gameState.playerDestroyed && !this.effects.gameOverAnimation) {
-      if (DEBUG) console.log('Player destroyed! Starting Game Over animation immediately...');
-      this.audio.playGameOver();
-      this.audio.createRobotSpeech("GAME OVER");
-      this.effects.startGameOverAnimation();
-      // Hide chain display on game over
-      this.overlay.hideChainOnGameOver();
+      // Decrement lives (only once)
+      if (!this.livesDecremented) {
+        this.lives--;
+        this.livesDecremented = true;
+        this.overlay.updateLives(this.lives);
+      }
+      
+      if (this.lives <= 0) {
+        // No lives left - game over
+        if (DEBUG) console.log('No lives left! Starting Game Over animation immediately...');
+        this.audio.playGameOver();
+        this.audio.createRobotSpeech("GAME OVER");
+        this.effects.startGameOverAnimation();
+        // Hide chain display on game over
+        this.overlay.hideChainOnGameOver();
+      } else {
+        // Still have lives - start enemy pause and respawn delays
+        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting 3-second enemy pause, then 2-second respawn delay...`);
+        this.enemyPauseDelay = 3.0; // 3 seconds of enemy pause
+        this.respawnDelay = 5.0; // 5 seconds total (3 + 2) before respawn
+      }
       this.engine.setGameState({ explosionComplete: true });
       return;
     }
@@ -593,10 +670,17 @@ class Game {
     // Clear all score popups
     this.overlay.clearAllScorePopups();
     
-    // Reset score
+    // Reset score and lives
     this.score = 0;
+    this.lives = 3; // Reset to 3 lives (2 extra)
+    this.livesDecremented = false; // Reset lives decremented flag
+    this.respawnDelay = 0; // Reset respawn delay
+    this.enemyPauseDelay = 0; // Reset enemy pause delay
+    this.enemyDiveDelay = 0; // Reset enemy dive delay
     this.overlay.resetScore();
     this.overlay.showScore(); // Show score for restart
+    this.overlay.showLives(); // Show lives display for restart
+    this.overlay.updateLives(this.lives); // Update lives display
     
     // Spawn new enemies for the restart level
     this.enemies.createEnemies(this.currentLevel, this.engine);
@@ -605,6 +689,39 @@ class Game {
     this.audio.updateSoundtrack(this.currentLevel);
     
     if (DEBUG) console.log(`Game restarted at level ${this.currentLevel}!`);
+  }
+
+  respawnPlayer() {
+    if (DEBUG) console.log('Respawning player...');
+    
+    // Reset game state
+    this.engine.resetGameState();
+    
+    // Reset lives decremented flag and delays
+    this.livesDecremented = false;
+    this.respawnDelay = 0;
+    this.enemyPauseDelay = 0;
+    this.enemyDiveDelay = 0;
+    
+    // Clear all effects
+    this.effects.clearAll();
+    
+    // Reset player position and state (remove wings on respawn)
+    this.player.reset(true);
+    
+    // Show player ship
+    this.player.show();
+    
+    // Clear all score popups
+    this.overlay.clearAllScorePopups();
+    
+    // Silently hide chain display for respawn (no "CHAIN BROKEN" text)
+    this.overlay.silentHideChain();
+    
+    // Reset game over state
+    this.overlay.resetGameOverState();
+    
+    if (DEBUG) console.log(`Player respawned! Lives remaining: ${this.lives}`);
   }
 }
 

@@ -671,6 +671,11 @@ export class Player {
   destroy() {
     this.scene.remove(this.mesh);
     // Cockpit and wings are automatically removed as they're children
+    
+    // Remove flame particle systems
+    this.particleSystems.forEach(particleSystem => {
+      this.scene.remove(particleSystem);
+    });
   }
 
   reset(removeWings = false) {
