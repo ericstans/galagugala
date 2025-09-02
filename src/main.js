@@ -128,7 +128,7 @@ class Game {
     if (DEBUG) console.log(`EnemyManager created with level ${this.currentLevel}`);
     
     // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.) and clear enemies
-    if (this.currentLevel % 10 === 0) {
+    if (this.currentLevel % 10 === 0 & this.currentLevel % 50 !== 0) {
       if (DEBUG) console.log(`Level ${this.currentLevel} detected in init - clearing enemies for plasma storm`);
       this.enemies.clearAll();
     }
@@ -231,7 +231,7 @@ class Game {
         if (DEBUG) console.log('Game started!');
         
         // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
-        if (this.currentLevel % 10 === 0) {
+        if (this.currentLevel % 10 === 0 & this.currentLevel % 50 !== 0) {
           if (DEBUG) console.log(`Level ${this.currentLevel} detected on game start - starting plasma storm`);
           this.startPlasmaStorm();
         }
@@ -406,6 +406,13 @@ class Game {
           this.enemies.removeEnemy(enemy, (position) => {
             this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
           });
+          
+          // Trigger level complete for boss destruction
+          if (this.enemies.enemies.length === 0) {
+            if (DEBUG) console.log('Boss destroyed! Starting level complete animation...');
+            this.effects.startLevelCompleteAnimation();
+            this.overlay.showLevelComplete();
+          }
         }
       } else {
         // Normal enemy - destroy immediately
@@ -475,6 +482,13 @@ class Game {
           this.enemies.removeEnemy(enemy, (position) => {
             this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
           });
+          
+          // Trigger level complete for boss destruction
+          if (this.enemies.enemies.length === 0) {
+            if (DEBUG) console.log('Boss destroyed! Starting level complete animation...');
+            this.effects.startLevelCompleteAnimation();
+            this.overlay.showLevelComplete();
+          }
         }
       } else {
         // Normal enemy - destroy immediately
@@ -801,13 +815,49 @@ class Game {
     if (DEBUG) console.log(`Starting level ${this.currentLevel}...`);
     
     // Check if this is a plasma storm level (every 10 levels)
-    if (this.currentLevel % 10 === 0) {
+    if (this.currentLevel % 10 === 0 & this.currentLevel % 50 !== 0) {
       this.startPlasmaStorm();
+      return; // Don't proceed with normal level start yet
+    }
+    
+    // Check if this is a boss level - handle with delay
+    if (this.currentLevel === 50 || this.currentLevel === 100) {
+      this.startBossLevel();
       return; // Don't proceed with normal level start yet
     }
     
     // Normal level progression
     this.proceedToNextLevel();
+  }
+
+  startBossLevel() {
+    // Update level display first
+    this.overlay.updateLevel(this.currentLevel);
+    
+    // Reset game state
+    this.engine.resetGameState();
+    
+    // Clear existing enemies
+    if (this.enemies) {
+      this.enemies.clearAll();
+    }
+    
+    // Play warning and spawn boss with delay
+    if (this.currentLevel === 50) {
+      if (DEBUG) console.log(`Level 50 detected - spawning boss instead of enemies`);
+      this.audio.createRobotSpeech("WARNING. A HYPERCUBE IS APPROACHING.");
+      // Wait 2 seconds after voice effect finishes before spawning boss
+      setTimeout(() => {
+        this.enemies.createBoss(this.engine);
+      }, 2000);
+    } else if (this.currentLevel === 100) {
+      if (DEBUG) console.log(`Level 100 detected - spawning final boss instead of enemies`);
+      this.audio.createRobotSpeech("WARNING. A HYPERCUBE IS APPROACHING.");
+      // Wait 2 seconds after voice effect finishes before spawning boss
+      setTimeout(() => {
+        this.enemies.createFinalBoss(this.engine);
+      }, 2000);
+    }
   }
 
   proceedToNextLevel() {
@@ -832,17 +882,9 @@ class Game {
     this.overlay.updateChain(currentChainCount);
     
     // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
-    if (this.currentLevel + 1 % 10 === 0) {
+    if (this.currentLevel % 10 === 0) {
       if (DEBUG) console.log(`Level ${this.currentLevel} detected - starting plasma storm instead of spawning enemies`);
       this.startPlasmaStorm();
-    } else if (this.currentLevel === 50) {
-      // Level 50 boss
-      if (DEBUG) console.log(`Level 50 detected - spawning boss instead of enemies`);
-      this.enemies.createBoss(this.engine);
-    } else if (this.currentLevel === 100) {
-      // Level 100 final boss
-      if (DEBUG) console.log(`Level 100 detected - spawning final boss instead of enemies`);
-      this.enemies.createFinalBoss(this.engine);
     } else {
       // Spawn new enemies for the next level with level-based scaling
       if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
@@ -973,17 +1015,25 @@ class Game {
     this.overlay.updateLives(this.lives); // Update lives display
     
     // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
-    if (this.currentLevel % 10 === 0) {
+    if (this.currentLevel % 10 === 0 & this.currentLevel % 50 !== 0) {
       if (DEBUG) console.log(`Level ${this.currentLevel} detected on restart - starting plasma storm instead of spawning enemies`);
       this.startPlasmaStorm();
     } else if (this.currentLevel === 50) {
       // Level 50 boss
       if (DEBUG) console.log(`Level 50 detected on restart - spawning boss instead of enemies`);
-      this.enemies.createBoss(this.engine);
+      this.audio.createRobotSpeech("WARNING. A HYPERCUBE IS APPROACHING.");
+      // Wait 2 seconds after voice effect finishes before spawning boss
+      setTimeout(() => {
+        this.enemies.createBoss(this.engine);
+      }, 2000);
     } else if (this.currentLevel === 100) {
       // Level 100 final boss
       if (DEBUG) console.log(`Level 100 detected on restart - spawning final boss instead of enemies`);
-      this.enemies.createFinalBoss(this.engine);
+      this.audio.createRobotSpeech("WARNING. A HYPERCUBE IS APPROACHING.");
+      // Wait 2 seconds after voice effect finishes before spawning boss
+      setTimeout(() => {
+        this.enemies.createFinalBoss(this.engine);
+      }, 2000);
     } else {
       // Spawn new enemies for the restart level
       this.enemies.createEnemies(this.currentLevel, this.engine);
