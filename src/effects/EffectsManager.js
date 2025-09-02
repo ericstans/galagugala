@@ -446,7 +446,7 @@ export class EffectsManager {
           0
         ),
         life: 1.0,
-        decay: 0.005
+        decay: 0.00167 // Reduced decay for 3x longer lifetime
       };
       
       this.scene.add(particle);
