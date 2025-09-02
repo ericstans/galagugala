@@ -301,14 +301,17 @@ export class OverlayManager {
       // Show "MAX" instead of 10
       this.chainDisplay.textContent = chainCount === 10 ? 'MAX' : chainCount;
       this.chainDisplay.style.display = 'block';
-      this.chainDisplay.style.opacity = '1'; // Ensure it's fully visible
+      // Don't set opacity explicitly - let CSS handle it
       
       // Start fade-out after 3 seconds
+      console.log(`Setting fade-out timer for chain ${chainCount}`);
       this.chainFadeTimeout = setTimeout(() => {
+        console.log(`Fade-out timer triggered for chain ${chainCount}`);
         this.chainDisplay.style.opacity = '0';
         
         // Hide the element after the fade animation completes
         setTimeout(() => {
+          console.log(`Hiding chain display for chain ${chainCount}`);
           this.chainDisplay.style.display = 'none';
           this.chainFadeTimeout = null;
         }, 500); // Match the transition duration
@@ -349,28 +352,33 @@ export class OverlayManager {
       return;
     }
     
-    if (chainCount > 2) {
-      // Only show new chain if "CHAIN BROKEN" animation is not in progress
-      if (!this.chainBrokenAnimating) {
-        this.showChain(chainCount);
-      }
-    } else {
-      // Only show "CHAIN BROKEN" if we had a chain before (not at game start)
-      if (this.lastChainCount > 2 && !this.chainBrokenAnimating) {
-        this.hideChain();
-      } else if (!this.chainBrokenAnimating) {
-        // Just hide the display without showing "CHAIN BROKEN" text
-        this.chainDisplay.style.display = 'none';
-        // Cancel any pending fade-out timeouts
-        if (this.chainFadeTimeout) {
-          clearTimeout(this.chainFadeTimeout);
-          this.chainFadeTimeout = null;
+    // Only update if chain count has changed
+    if (chainCount !== this.lastChainCount) {
+      console.log(`Chain count changed from ${this.lastChainCount} to ${chainCount}`);
+      if (chainCount > 2) {
+        // Only show new chain if "CHAIN BROKEN" animation is not in progress
+        if (!this.chainBrokenAnimating) {
+          console.log(`Showing chain ${chainCount}`);
+          this.showChain(chainCount);
+        }
+      } else {
+        // Only show "CHAIN BROKEN" if we had a chain before (not at game start)
+        if (this.lastChainCount > 2 && !this.chainBrokenAnimating) {
+          this.hideChain();
+        } else if (!this.chainBrokenAnimating) {
+          // Just hide the display without showing "CHAIN BROKEN" text
+          this.chainDisplay.style.display = 'none';
+          // Cancel any pending fade-out timeouts
+          if (this.chainFadeTimeout) {
+            clearTimeout(this.chainFadeTimeout);
+            this.chainFadeTimeout = null;
+          }
         }
       }
+      
+      // Update the last chain count for next comparison
+      this.lastChainCount = chainCount;
     }
-    
-    // Update the last chain count for next comparison
-    this.lastChainCount = chainCount;
   }
 
   // Silently hide chain display without showing "CHAIN BROKEN" text
