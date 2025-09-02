@@ -401,7 +401,7 @@ export class Player {
     // Cockpit and wings are automatically removed as they're children
   }
 
-  reset() {
+  reset(removeWings = false) {
     console.log('Resetting player...');
     
     // Re-add ship to scene if it's not already there
@@ -434,8 +434,22 @@ export class Player {
     this.invulnerabilityFlashTimer = 0;
     this.originalMaterials.clear();
     
-    // Keep existing wings (don't remove ship enhancements)
-    // Wings will remain attached to the player ship
+    // Remove wings only if explicitly requested (game restart)
+    if (removeWings) {
+      if (this.leftWing) {
+        this.mesh.remove(this.leftWing);
+        this.leftWing = null;
+        console.log('Left wing removed on reset');
+      }
+      
+      if (this.rightWing) {
+        this.mesh.remove(this.rightWing);
+        this.rightWing = null;
+        console.log('Right wing removed on reset');
+      }
+    } else {
+      console.log('Wings preserved for level progression');
+    }
     
     console.log('Player reset complete');
   }

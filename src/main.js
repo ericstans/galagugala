@@ -409,8 +409,8 @@ class Game {
     // Clear all effects
     this.effects.clearAll();
     
-    // Reset player position and state
-    this.player.reset();
+    // Reset player position and state (remove wings on game restart)
+    this.player.reset(true);
     
     // Clear all enemies and power-ups
     this.enemies.clearAll();
