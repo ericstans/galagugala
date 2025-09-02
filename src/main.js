@@ -1000,7 +1000,7 @@ class Game {
           if (DEBUG) console.log('Stopping arp and proceeding to next level');
           this.audio.stopArp();
           setTimeout(() => {
-            this.proceedToNextLevel();
+            this.startNextLevel();
           }, 2000);
         }, 2500); // Continue arp for 2.5 second after power-ups end
       }
