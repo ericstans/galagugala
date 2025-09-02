@@ -17,20 +17,48 @@ class Game {
     this.overlay = new OverlayManager();
     
     this.player = new Player(this.engine.scene);
-    this.enemies = new EnemyManager(this.engine.scene);
+    
+    // Level progression - check URL parameter
+    this.currentLevel = this.getLevelFromURL();
+    console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
+    
+    this.enemies = new EnemyManager(this.engine.scene, this.currentLevel);
+    console.log(`EnemyManager created with level ${this.currentLevel}`);
     this.powerUps = new PowerUpManager(this.engine.scene);
     this.effects = new EffectsManager(this.engine.scene);
     
-    // Level progression
-    this.currentLevel = 1;
-    
     this.audioStarted = false;
+  }
+
+  getLevelFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const levelParam = urlParams.get('level');
+    
+    console.log(`URL search params: ${window.location.search}`);
+    console.log(`Level parameter from URL: ${levelParam}`);
+    
+    if (levelParam) {
+      const level = parseInt(levelParam, 10);
+      console.log(`Parsed level: ${level}`);
+      if (level >= 1 && level <= 100) { // Reasonable level range
+        console.log(`Starting game at level ${level} (from URL parameter)`);
+        return level;
+      } else {
+        console.warn(`Invalid level parameter: ${levelParam}. Must be between 1-100. Starting at level 1.`);
+      }
+    }
+    
+    console.log(`No valid level parameter found, defaulting to level 1`);
+    return 1; // Default to level 1
   }
   
   init() {
     this.engine.init();
     this.setupAudioStart();
     this.engine.animate(() => this.update());
+    
+    // Start soundtrack for current level
+    this.audio.updateSoundtrack(this.currentLevel);
   }
   
   setupAudioStart() {
@@ -139,8 +167,17 @@ class Game {
         if (powerUpResult.type === 'red' && powerUpResult.wingsAdded && powerUpResult.wingsAdded.length > 0) {
           console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
         }
+        
+        // Handle chain updates for blue power-ups
+        if (powerUpResult.type === 'blue' && powerUpResult.chainCount !== undefined) {
+          this.overlay.updateChain(powerUpResult.chainCount);
+        }
       }
     }
+    
+    // Update chain display based on current chain count
+    const currentChainCount = this.powerUps.getChainCount();
+    this.overlay.updateChain(currentChainCount);
   }
   
   checkGameState(completedExplosion, levelCompleteFinished, gameOverFinished) {
@@ -217,10 +254,10 @@ class Game {
       return;
     }
     
-    // Handle game over animation finished
-    if (gameOverFinished) {
-      console.log('Game Over animation finished!');
-      // Game stays in game over state - could add restart logic here
+    // Handle restart when game over and SPACE is pressed
+    if (this.effects.isWaitingForRestart() && this.input.isShootPressed()) {
+      console.log('Restarting game...');
+      this.restartGame();
       return;
     }
 
@@ -258,13 +295,49 @@ class Game {
     this.enemies.clearAll();
     this.powerUps.clearAll();
     
+    // Hide chain display for new level
+    this.overlay.hideChain();
+    
     // Spawn new enemies for the next level with level-based scaling
+    console.log(`Creating enemies for level ${this.currentLevel}...`);
     this.enemies.createEnemies(this.currentLevel);
     
-    // Play level start sound (if you want to add one)
-    // this.audio.playLevelStart();
+    // Update soundtrack for new level
+    this.audio.updateSoundtrack(this.currentLevel);
     
     console.log(`Level ${this.currentLevel} started!`);
+  }
+
+  restartGame() {
+    console.log('Restarting game...');
+    
+    // Reset level to URL parameter level (or 1 if no parameter)
+    this.currentLevel = this.getLevelFromURL();
+    console.log(`Restarting at level ${this.currentLevel} (from URL parameter)`);
+    
+    // Reset game state
+    this.engine.resetGameState();
+    
+    // Clear all effects
+    this.effects.clearAll();
+    
+    // Reset player position and state
+    this.player.reset();
+    
+    // Clear all enemies and power-ups
+    this.enemies.clearAll();
+    this.powerUps.clearAll();
+    
+    // Hide chain display for restart
+    this.overlay.hideChain();
+    
+    // Spawn new enemies for the restart level
+    this.enemies.createEnemies(this.currentLevel);
+    
+    // Start soundtrack for the restart level
+    this.audio.updateSoundtrack(this.currentLevel);
+    
+    console.log(`Game restarted at level ${this.currentLevel}!`);
   }
 }
 

@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
 export class EnemyManager {
-  constructor(scene) {
+  constructor(scene, level = 1) {
     this.scene = scene;
     this.enemies = [];
     this.diveCooldown = 0;
     this.gameStartTimer = 0;
     this.enemyGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.3);
     this.enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333 });
-    this.createEnemies();
+    this.createEnemies(level);
   }
 
   createEnemies(level = 1) {
@@ -26,9 +26,22 @@ export class EnemyManager {
     const totalRows = Math.min(baseRows + additionalRows, 8); // Cap at 8 rows
     const totalCols = Math.min(baseCols + additionalCols, 12); // Cap at 12 columns
     
+    console.log(`Level ${level} calculation: baseRows=${baseRows}, baseCols=${baseCols}, additionalRows=${additionalRows}, additionalCols=${additionalCols}, totalRows=${totalRows}, totalCols=${totalCols}`);
+    
+    // Calculate dynamic Y spacing to keep formation on screen
+    // Camera is at z=10 with 75° FOV, so visible height ≈ 14.6 units
+    const maxVisibleHeight = 14.6;
+    const topMargin = 2.0; // Keep some margin from top
+    const bottomMargin = 1.5; // Keep some margin from bottom
+    const availableHeight = maxVisibleHeight - topMargin - bottomMargin;
+    
+    // Calculate Y spacing to fit all rows within available height
+    const dynamicYSpacing = totalRows > 1 ? availableHeight / (totalRows - 1) : GAME_CONFIG.ENEMY_Y_SPACING;
+    const clampedYSpacing = Math.min(dynamicYSpacing, GAME_CONFIG.ENEMY_Y_SPACING); // Don't exceed original spacing
+    
     // Calculate dynamic enemy size based on formation size
     const maxFormationWidth = (totalCols - 1) * GAME_CONFIG.ENEMY_X_SPACING;
-    const maxFormationHeight = (totalRows - 1) * GAME_CONFIG.ENEMY_Y_SPACING;
+    const maxFormationHeight = (totalRows - 1) * clampedYSpacing;
     const formationArea = maxFormationWidth * maxFormationHeight;
     
     // Scale enemy size inversely with formation area (larger formations = smaller enemies)
@@ -39,13 +52,13 @@ export class EnemyManager {
     // Create new geometry with scaled size
     const scaledGeometry = new THREE.BoxGeometry(enemySize, enemySize, enemySize * 0.4);
     
-    console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}`);
+    console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}, Y spacing ${clampedYSpacing.toFixed(2)}`);
     
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
         const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
         const formationX = (col - totalCols / 2 + 0.5) * GAME_CONFIG.ENEMY_X_SPACING;
-        const formationY = row * GAME_CONFIG.ENEMY_Y_SPACING + 1.5;
+        const formationY = row * clampedYSpacing + bottomMargin;
         enemy.position.set(formationX, formationY, 0);
         enemy.userData = {
           formationX,

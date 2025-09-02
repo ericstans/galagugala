@@ -1,6 +1,7 @@
 export class OverlayManager {
   constructor() {
     this.overlay = this.createOverlay();
+    this.chainDisplay = this.createChainDisplay();
     this.setupEventListeners();
   }
 
@@ -33,6 +34,30 @@ export class OverlayManager {
       document.body.appendChild(overlay);
     }
     return overlay;
+  }
+
+  createChainDisplay() {
+    let chainDisplay = document.getElementById('chain-display');
+    if (!chainDisplay) {
+      chainDisplay = document.createElement('div');
+      chainDisplay.id = 'chain-display';
+      chainDisplay.style.position = 'fixed';
+      chainDisplay.style.top = '50%';
+      chainDisplay.style.left = '50%';
+      chainDisplay.style.transform = 'translate(-50%, -50%)';
+      chainDisplay.style.fontSize = '8rem';
+      chainDisplay.style.fontWeight = 'bold';
+      chainDisplay.style.color = '#00fffc';
+      chainDisplay.style.fontFamily = 'Arial, sans-serif';
+      chainDisplay.style.textAlign = 'center';
+      chainDisplay.style.textShadow = '0 0 20px #00fffc, 0 0 40px #00fffc';
+      chainDisplay.style.zIndex = '500'; // Behind other elements but above game
+      chainDisplay.style.display = 'none';
+      chainDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
+      chainDisplay.style.userSelect = 'none';
+      document.body.appendChild(chainDisplay);
+    }
+    return chainDisplay;
   }
 
   setupEventListeners() {
@@ -126,5 +151,25 @@ export class OverlayManager {
 
   hideOverlay() {
     this.overlay.style.display = 'none';
+  }
+
+  // Chain display methods
+  showChain(chainCount) {
+    if (chainCount > 2) {
+      this.chainDisplay.textContent = chainCount;
+      this.chainDisplay.style.display = 'block';
+    }
+  }
+
+  hideChain() {
+    this.chainDisplay.style.display = 'none';
+  }
+
+  updateChain(chainCount) {
+    if (chainCount > 2) {
+      this.showChain(chainCount);
+    } else {
+      this.hideChain();
+    }
   }
 }

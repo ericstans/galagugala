@@ -404,6 +404,12 @@ export class Player {
   reset() {
     console.log('Resetting player...');
     
+    // Re-add ship to scene if it's not already there
+    if (!this.scene.children.includes(this.mesh)) {
+      this.scene.add(this.mesh);
+      console.log('Re-added player ship to scene');
+    }
+    
     // Reset position
     this.mesh.position.set(0, -6.5, 0);
     

@@ -9,6 +9,9 @@ export class PowerUpManager {
     this.powerUps = [];
     this.spawnTimer = 0;
     this.powerUpGeometry = new THREE.SphereGeometry(0.15, 16, 12);
+    
+    // Chain mechanic
+    this.chainCount = 0;
   }
 
   createPowerUp(type = 'blue') {
@@ -151,6 +154,12 @@ export class PowerUpManager {
       // Remove if fallen off screen
       if (powerUp.position.y < -8) {
         if (debug) console.log('Power-up removed (fell off screen)');
+        
+        // Reset chain if blue power-up falls off screen
+        if (powerUp.userData.type === 'blue') {
+          this.resetChain();
+        }
+        
         this.scene.remove(powerUp);
         this.powerUps.splice(i, 1);
       }
@@ -194,7 +203,8 @@ export class PowerUpManager {
         }
       } else {
         if (debug) console.log('Blue power-up collected! (Standard effect)');
-        return { type: 'blue' };
+        this.incrementChain();
+        return { type: 'blue', chainCount: this.chainCount };
       }
     }
     return null;
@@ -215,5 +225,23 @@ export class PowerUpManager {
       this.scene.remove(powerUp);
     });
     this.powerUps = [];
+    this.resetChain();
+  }
+
+  // Chain mechanic methods
+  incrementChain() {
+    this.chainCount++;
+    console.log(`Chain incremented to ${this.chainCount}`);
+  }
+
+  resetChain() {
+    if (this.chainCount > 0) {
+      console.log(`Chain broken! Was at ${this.chainCount}`);
+      this.chainCount = 0;
+    }
+  }
+
+  getChainCount() {
+    return this.chainCount;
   }
 }

@@ -224,9 +224,9 @@ export class EffectsManager {
   startGameOverAnimation() {
     this.gameOverAnimation = {
       active: true,
-      duration: 300, // 5 seconds at 60fps
       time: 0,
-      phase: 'fadeIn' // 'fadeIn' | 'display' | 'fadeOut'
+      phase: 'fadeIn', // 'fadeIn' | 'display'
+      waitingForRestart: false
     };
     
     // Create "GAME OVER" text
@@ -259,7 +259,7 @@ export class EffectsManager {
           [0, 0], [1, 0], [2, 0], [3, 0], // top
           [0, 1], [0, 2], [0, 3], [0, 4], // left
           [0, 4], [1, 4], [2, 4], [3, 4], // bottom
-          [3, 4], [3, 3], [3, 2],         // right bottom
+          [3, 4], [3, 2], [3, 1], // right
           [2, 2], [3, 2]                  // middle right
         ],
         'A': [
@@ -271,7 +271,7 @@ export class EffectsManager {
         'M': [
           [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
           [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], // right
-          [1, 2], [2, 2]                           // middle
+          [1, 3], [2, 3]                           // middle
         ],
         'E': [
           [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
@@ -368,8 +368,6 @@ export class EffectsManager {
     // Update text fade
     if (this.gameOverText) {
       const fadeInDuration = 60; // 1 second
-      const displayDuration = 180; // 3 seconds
-      const fadeOutDuration = 60; // 1 second
       
       let opacity = 0;
       
@@ -377,18 +375,11 @@ export class EffectsManager {
         // Fade in
         opacity = this.gameOverAnimation.time / fadeInDuration;
         this.gameOverAnimation.phase = 'fadeIn';
-      } else if (this.gameOverAnimation.time < fadeInDuration + displayDuration) {
-        // Display
+      } else {
+        // Display and stay visible
         opacity = 1.0;
         this.gameOverAnimation.phase = 'display';
-      } else if (this.gameOverAnimation.time < fadeInDuration + displayDuration + fadeOutDuration) {
-        // Fade out
-        const fadeOutTime = this.gameOverAnimation.time - (fadeInDuration + displayDuration);
-        opacity = 1.0 - (fadeOutTime / fadeOutDuration);
-        this.gameOverAnimation.phase = 'fadeOut';
-      } else {
-        // Animation complete
-        opacity = 0;
+        this.gameOverAnimation.waitingForRestart = true;
       }
       
       // Apply opacity to all text letters
@@ -399,7 +390,7 @@ export class EffectsManager {
       });
     }
     
-    // Update particles
+    // Update particles continuously
     for (let i = this.gameOverParticles.length - 1; i >= 0; i--) {
       const particle = this.gameOverParticles[i];
       
@@ -416,16 +407,12 @@ export class EffectsManager {
         this.gameOverParticles.splice(i, 1);
       }
     }
-    
-    // Check if animation is complete
-    if (this.gameOverAnimation.time >= this.gameOverAnimation.duration) {
-      this.gameOverAnimation.active = false;
-      this.clearGameOverAnimation();
-      console.log('Game Over animation finished!');
-      return true; // Animation completed
-    }
 
-    return false; // Animation still running
+    return false; // Animation stays active until restart
+  }
+
+  isWaitingForRestart() {
+    return this.gameOverAnimation && this.gameOverAnimation.waitingForRestart;
   }
 
   clearGameOverAnimation() {
