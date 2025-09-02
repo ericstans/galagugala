@@ -13,6 +13,9 @@ export class CollisionHandler {
     for (const collision of collisionResults.bulletCollisions) {
       const { bulletIndex, enemyIndex, bullet, enemy } = collision;
       
+      // Mark enemy as destroyed immediately to prevent further collisions
+      enemy.userData.isDestroyed = true;
+      
       // Remove bullet and enemy
       this.scene.remove(bullet);
       this.scene.remove(enemy);
@@ -26,6 +29,9 @@ export class CollisionHandler {
     // Handle wing bullet-enemy collisions
     for (const collision of collisionResults.wingBulletCollisions) {
       const { bulletIndex, enemyIndex, bullet, enemy } = collision;
+      
+      // Mark enemy as destroyed immediately to prevent further collisions
+      enemy.userData.isDestroyed = true;
       
       // Remove bullet and enemy
       this.scene.remove(bullet);
@@ -53,6 +59,9 @@ export class CollisionHandler {
     // Handle wing-enemy collisions
     for (const collision of collisionResults.wingCollisions) {
       const { wing, enemy, side } = collision;
+      
+      // Mark enemy as destroyed immediately to prevent further collisions
+      enemy.userData.isDestroyed = true;
       
       // Create explosion at wing position
       const wingWorldPos = new THREE.Vector3();

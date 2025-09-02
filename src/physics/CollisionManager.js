@@ -11,6 +11,10 @@ export class CollisionManager {
       const bullet = bullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
+        // Skip destroyed enemies
+        if (enemy.userData && enemy.userData.isDestroyed) {
+          continue;
+        }
         if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
@@ -24,6 +28,10 @@ export class CollisionManager {
       const bullet = wingBullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
+        // Skip destroyed enemies
+        if (enemy.userData && enemy.userData.isDestroyed) {
+          continue;
+        }
         if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
@@ -34,6 +42,10 @@ export class CollisionManager {
 
   static checkPlayerEnemyCollision(player, enemies, threshold = GAME_CONFIG.PLAYER_COLLISION_THRESHOLD) {
     for (let enemy of enemies) {
+      // Skip destroyed enemies
+      if (enemy.userData && enemy.userData.isDestroyed) {
+        continue;
+      }
       if (enemy.position.distanceTo(player.position) < threshold) {
         return enemy;
       }
@@ -43,6 +55,11 @@ export class CollisionManager {
 
   static checkWingEnemyCollision(player, enemies, threshold = GAME_CONFIG.COLLISION_THRESHOLD) {
     for (let enemy of enemies) {
+      // Skip destroyed enemies
+      if (enemy.userData && enemy.userData.isDestroyed) {
+        continue;
+      }
+      
       // Check left wing collision
       if (player.leftWing && !player.leftWing.userData.isDestroyed) {
         const leftWingWorldPos = new THREE.Vector3();
