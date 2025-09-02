@@ -8,7 +8,7 @@ import { EffectsManager } from './effects/EffectsManager.js';
 import { InputManager } from './input/InputManager.js';
 import { OverlayManager } from './ui/OverlayManager.js';
 import { CollisionManager } from './physics/CollisionManager.js';
-
+ 
 class Game {
   constructor() {
     this.engine = new GameEngine();
