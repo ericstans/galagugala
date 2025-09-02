@@ -93,6 +93,9 @@ class Game {
   startFinalBossExplosion(boss) {
     if (DEBUG) console.log('Starting final boss explosion sequence');
     
+    // Stop the lead synth immediately when boss explodes
+    this.audio.stopLeadSynth();
+    
     // Stop the boss from firing and moving
     boss.userData.isDestroyed = true;
     boss.userData.fireCooldown = 999999; // Prevent firing
@@ -402,6 +405,9 @@ class Game {
             return;
           }
           
+          // Stop the lead synth immediately when boss explodes
+          this.audio.stopLeadSynth();
+          
           // Remove boss
           this.enemies.removeEnemy(enemy, (position) => {
             this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
@@ -477,6 +483,9 @@ class Game {
             this.startFinalBossExplosion(enemy);
             return;
           }
+          
+          // Stop the lead synth immediately when boss explodes
+          this.audio.stopLeadSynth();
           
           // Remove boss
           this.enemies.removeEnemy(enemy, (position) => {
@@ -814,6 +823,9 @@ class Game {
     this.currentLevel++;
     if (DEBUG) console.log(`Starting level ${this.currentLevel}...`);
     
+    // Stop lead synth when transitioning to new level (in case it was playing from boss level)
+    this.audio.stopLeadSynth();
+    
     // Check if this is a plasma storm level (every 10 levels)
     if (this.currentLevel % 10 === 0 & this.currentLevel % 50 !== 0) {
       this.startPlasmaStorm();
@@ -841,6 +853,9 @@ class Game {
     if (this.enemies) {
       this.enemies.clearAll();
     }
+    
+    // Update soundtrack for boss level
+    this.audio.updateSoundtrack(this.currentLevel);
     
     // Play warning and spawn boss with delay
     if (this.currentLevel === 50) {
@@ -978,6 +993,9 @@ class Game {
     
     // Clear all effects
     this.effects.clearAll();
+    
+    // Stop lead synth on game restart
+    this.audio.stopLeadSynth();
     
     // Reset player position and state (remove wings on game restart)
     this.player.reset(true);

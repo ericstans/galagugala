@@ -31,6 +31,10 @@ export class AudioManager {
     this.centralBeatScheduler = null; // Central beat scheduler for all layers
     this.activeLayers = new Set(); // Track which layers are currently active
     
+    // Lead synth state for monophonic behavior
+    this.leadSynthOscillator = null; // Current lead synth oscillator
+    this.leadSynthCurrentFreq = null; // Current frequency for portamento
+    
     // Bongo rhythm pattern system
     this.bongoPattern = null; // 4-bar pattern in 8th notes
     this.bongoPatternPosition = 0; // Current position in pattern
@@ -791,6 +795,130 @@ export class AudioManager {
     return bongo;
   }
 
+  createLeadSynth() {
+    if (!this.audioContext) return null;
+    
+    // Lead synth plays current chord notes in a higher octave
+    const chordProgressions = {
+      'Cmin': [261.63, 311.13, 392.00],      // C4, Eb4, G4
+      'Cmin7': [261.63, 311.13, 392.00, 466.16], // C4, Eb4, G4, Bb4
+      'Dmin': [293.66, 349.23, 440.00],      // D4, F4, A4
+      'EbMaj': [311.13, 392.00, 466.16],     // Eb4, G4, Bb4
+      'Fmin7': [349.23, 415.30, 523.25, 622.25], // F4, Ab4, C5, Eb5
+      'Gmin7': [392.00, 466.16, 587.33, 698.46]  // G4, Bb4, D5, F5
+    };
+    
+    // Use the current chord or select a new one
+    if (!this.currentChord) {
+      this.selectRandomChord();
+    }
+    
+    const chordFrequencies = chordProgressions[this.currentChord];
+    if (!chordFrequencies || chordFrequencies.length === 0) {
+      if (DEBUG) console.log(`Lead synth: no frequencies for chord: ${this.currentChord}`);
+      return null;
+    }
+    
+    // Choose a random note from the chord, transposed up 2 octaves
+    const baseFrequency = chordFrequencies[Math.floor(Math.random() * chordFrequencies.length)];
+    const targetFrequency = baseFrequency * 4; // 2 octaves up
+    
+    if (DEBUG) console.log(`Lead synth playing ${this.currentChord} note at ${targetFrequency}Hz`);
+    
+    // If no oscillator exists, create the initial one
+    if (!this.leadSynthOscillator) {
+      this.leadSynthOscillator = this.audioContext.createOscillator();
+      this.leadSynthGainNode = this.audioContext.createGain();
+      this.leadSynthFilter = this.audioContext.createBiquadFilter();
+      this.leadSynthLfo = this.audioContext.createOscillator();
+      this.leadSynthLfoGain = this.audioContext.createGain();
+      
+      // Phaser effect components
+      this.leadSynthPhaserLfo = this.audioContext.createOscillator();
+      this.leadSynthPhaserGain = this.audioContext.createGain();
+      this.leadSynthPhaserFilter1 = this.audioContext.createBiquadFilter();
+      this.leadSynthPhaserFilter2 = this.audioContext.createBiquadFilter();
+      this.leadSynthPhaserFilter3 = this.audioContext.createBiquadFilter();
+      this.leadSynthPhaserFilter4 = this.audioContext.createBiquadFilter();
+      
+      // Set up the oscillator
+      this.leadSynthOscillator.type = 'sawtooth';
+      this.leadSynthCurrentFreq = targetFrequency;
+      this.leadSynthOscillator.frequency.setValueAtTime(targetFrequency, this.audioContext.currentTime);
+      
+      // LFO for subtle vibrato
+      this.leadSynthLfo.type = 'sine';
+      this.leadSynthLfo.frequency.setValueAtTime(4, this.audioContext.currentTime);
+      this.leadSynthLfoGain.gain.setValueAtTime(5, this.audioContext.currentTime);
+      
+      // Phaser LFO - slow sweeping effect
+      this.leadSynthPhaserLfo.type = 'sine';
+      this.leadSynthPhaserLfo.frequency.setValueAtTime(0.4, this.audioContext.currentTime); // 0.4Hz for slow sweep
+      this.leadSynthPhaserGain.gain.setValueAtTime(800, this.audioContext.currentTime); // Large modulation range
+      
+      // Multiple allpass filters for stronger phaser effect
+      const phaserFilters = [
+        this.leadSynthPhaserFilter1,
+        this.leadSynthPhaserFilter2,
+        this.leadSynthPhaserFilter3,
+        this.leadSynthPhaserFilter4
+      ];
+      
+      phaserFilters.forEach((filter, index) => {
+        filter.type = 'allpass';
+        filter.frequency.setValueAtTime(800 + (index * 200), this.audioContext.currentTime); // Staggered frequencies
+        filter.Q.setValueAtTime(1, this.audioContext.currentTime);
+      });
+      
+      // Main filter for warm analog sound with steep low-pass at 800Hz
+      this.leadSynthFilter.type = 'lowpass';
+      this.leadSynthFilter.frequency.setValueAtTime(800, this.audioContext.currentTime);
+      this.leadSynthFilter.Q.setValueAtTime(8, this.audioContext.currentTime);
+      
+      // Set up gain envelope (continuous sustain)
+      this.leadSynthGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      this.leadSynthGainNode.gain.linearRampToValueAtTime(0.4, this.audioContext.currentTime + 0.5);
+      
+      // Connect audio chain with phaser
+      this.leadSynthLfo.connect(this.leadSynthLfoGain);
+      this.leadSynthLfoGain.connect(this.leadSynthOscillator.frequency);
+      
+      // Phaser modulation - connect LFO to all phaser filters
+      this.leadSynthPhaserLfo.connect(this.leadSynthPhaserGain);
+      phaserFilters.forEach(filter => {
+        this.leadSynthPhaserGain.connect(filter.frequency);
+      });
+      
+      // Audio routing: oscillator -> phaser filters (in series) -> main filter -> gain -> output
+      this.leadSynthOscillator.connect(this.leadSynthPhaserFilter1);
+      this.leadSynthPhaserFilter1.connect(this.leadSynthPhaserFilter2);
+      this.leadSynthPhaserFilter2.connect(this.leadSynthPhaserFilter3);
+      this.leadSynthPhaserFilter3.connect(this.leadSynthPhaserFilter4);
+      this.leadSynthPhaserFilter4.connect(this.leadSynthFilter);
+      this.leadSynthFilter.connect(this.leadSynthGainNode);
+      this.leadSynthGainNode.connect(this.soundtrackBus);
+      
+      // Start oscillators
+      this.leadSynthLfo.start(this.audioContext.currentTime);
+      this.leadSynthPhaserLfo.start(this.audioContext.currentTime);
+      this.leadSynthOscillator.start(this.audioContext.currentTime);
+      
+      if (DEBUG) console.log('Lead synth oscillator with phaser created and started');
+    } else {
+      // Monophonic: smoothly transition to new frequency with portamento
+      const portamentoTime = 0.3; // 300ms portamento
+      this.leadSynthOscillator.frequency.exponentialRampToValueAtTime(
+        targetFrequency, 
+        this.audioContext.currentTime + portamentoTime
+      );
+      this.leadSynthCurrentFreq = targetFrequency;
+      
+      if (DEBUG) console.log(`Lead synth portamento to ${targetFrequency}Hz`);
+    }
+    
+    return this.leadSynthOscillator;
+  }
+
   createArp() {
     if (!this.audioContext) return null;
     if (!this.arpActive) return null; // Don't play if arp is no longer active
@@ -1226,6 +1354,12 @@ export class AudioManager {
 
   // Level-based soundtrack progression (changes every 2 levels)
   getLayersForLevel(level) {
+    // Boss levels get all layers plus lead synth
+    if (level === 50 || level === 100) {
+      console.log(`Boss level ${level} detected - playing all layers plus lead synth`);
+      return ['kick', 'hats', 'bass', 'chords', 'bongos', 'lead'];
+    }
+    
     // Calculate which soundtrack phase we're in (every 2 levels)
     const soundtrackPhase = Math.floor((level - 1) / 2) + 1;
     const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
@@ -1278,7 +1412,7 @@ export class AudioManager {
     const cyclePhase = ((soundtrackPhase - 1) % 13) + 1;
     const activeLayers = this.getLayersForLevel(this.currentLevel);
     
-    if (DEBUG) console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Updating layers:`, activeLayers);
+    console.log(`Level ${this.currentLevel} (Phase ${cyclePhase}): Updating layers:`, activeLayers);
     
     // Check if bongos are starting (weren't active before, but are now)
     const bongosStarting = !this.activeLayers.has('bongos') && activeLayers.includes('bongos');
@@ -1366,6 +1500,14 @@ export class AudioManager {
         }
       }
       
+      if (this.activeLayers.has('lead')) {
+        // Lead synth plays every 4 beats (long sustained notes)
+        if (this.globalBeatCounter % 4 === 1) {
+          if (DEBUG) console.log(`Playing lead synth on beat ${this.globalBeatCounter}`);
+          this.createLeadSynth();
+        }
+      }
+      
       // Arp layer - only plays during plasma storms
       if (this.arpActive) {
         if (this.arpPhase === 'warning') {
@@ -1443,6 +1585,35 @@ export class AudioManager {
   stopAllLayers() {
     this.stopCentralBeatScheduler();
     this.activeLayers.clear();
+    this.stopLeadSynth();
+  }
+
+  stopLeadSynth() {
+    if (this.leadSynthOscillator) {
+      try {
+        this.leadSynthOscillator.stop();
+      } catch (e) {
+        // Oscillator might already be stopped
+      }
+      this.leadSynthOscillator = null;
+    }
+    if (this.leadSynthLfo) {
+      try {
+        this.leadSynthLfo.stop();
+      } catch (e) {
+        // LFO might already be stopped
+      }
+      this.leadSynthLfo = null;
+    }
+    if (this.leadSynthPhaserLfo) {
+      try {
+        this.leadSynthPhaserLfo.stop();
+      } catch (e) {
+        // Phaser LFO might already be stopped
+      }
+      this.leadSynthPhaserLfo = null;
+    }
+    this.leadSynthCurrentFreq = null;
   }
 
   // Initialize voice selection when audio manager starts
