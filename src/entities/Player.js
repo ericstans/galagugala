@@ -100,8 +100,8 @@ export class Player {
     gun.position.set(side === 'left' ? -0.25 : 0.25, 0, 0);
     wingGroup.add(gun);
     
-    // Position wing relative to ship
-    wingGroup.position.set(side === 'left' ? -0.6 : 0.6, -0.2, 0);
+    // Position wing relative to ship (moved 10px lower on Y axis - positive Y since ship is rotated)
+    wingGroup.position.set(side === 'left' ? -0.6 : 0.6, 0.2, 0);
     wingGroup.userData = {
       side: side,
       isDestroyed: false,
