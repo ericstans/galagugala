@@ -11,7 +11,9 @@ export class CollisionManager {
       const bullet = bullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
-        if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
+        // Use boss-specific threshold for bosses, regular threshold for other enemies
+        const threshold = enemy.userData.isBoss ? GAME_CONFIG.BOSS_COLLISION_THRESHOLD : GAME_CONFIG.COLLISION_THRESHOLD;
+        if (this.checkCollision(bullet, enemy, threshold)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
       }
@@ -24,7 +26,9 @@ export class CollisionManager {
       const bullet = wingBullets[bi];
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
         const enemy = enemies[ei];
-        if (this.checkCollision(bullet, enemy, GAME_CONFIG.COLLISION_THRESHOLD)) {
+        // Use boss-specific threshold for bosses, regular threshold for other enemies
+        const threshold = enemy.userData.isBoss ? GAME_CONFIG.BOSS_COLLISION_THRESHOLD : GAME_CONFIG.COLLISION_THRESHOLD;
+        if (this.checkCollision(bullet, enemy, threshold)) {
           return { bulletIndex: bi, enemyIndex: ei, bullet, enemy };
         }
       }
@@ -43,11 +47,14 @@ export class CollisionManager {
 
   static checkWingEnemyCollision(player, enemies, threshold = GAME_CONFIG.COLLISION_THRESHOLD) {
     for (let enemy of enemies) {
+      // Use boss-specific threshold for bosses, regular threshold for other enemies
+      const collisionThreshold = enemy.userData.isBoss ? GAME_CONFIG.BOSS_COLLISION_THRESHOLD : threshold;
+      
       // Check left wing collision
       if (player.leftWing && !player.leftWing.userData.isDestroyed) {
         const leftWingWorldPos = new THREE.Vector3();
         player.leftWing.getWorldPosition(leftWingWorldPos);
-        if (enemy.position.distanceTo(leftWingWorldPos) < threshold) {
+        if (enemy.position.distanceTo(leftWingWorldPos) < collisionThreshold) {
           return { wing: player.leftWing, enemy, side: 'left' };
         }
       }
@@ -56,7 +63,7 @@ export class CollisionManager {
       if (player.rightWing && !player.rightWing.userData.isDestroyed) {
         const rightWingWorldPos = new THREE.Vector3();
         player.rightWing.getWorldPosition(rightWingWorldPos);
-        if (enemy.position.distanceTo(rightWingWorldPos) < threshold) {
+        if (enemy.position.distanceTo(rightWingWorldPos) < collisionThreshold) {
           return { wing: player.rightWing, enemy, side: 'right' };
         }
       }

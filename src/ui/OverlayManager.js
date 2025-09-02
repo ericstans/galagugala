@@ -651,7 +651,7 @@ export class OverlayManager {
       
       // Instructions
       const instructions = document.createElement('div');
-      instructions.textContent = 'Press R to restart or refresh the page';
+      instructions.textContent = 'Press ENTER to restart';
       instructions.style.cssText = `
         font-size: 1.2em;
         color: #cccccc;

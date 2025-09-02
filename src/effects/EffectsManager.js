@@ -711,6 +711,9 @@ export class EffectsManager {
     this.finalBossExplosionTimer = 0;
     this.finalBossExplosionBoss = boss;
     this.finalBossExplosionCubes = [...boss.children]; // Copy the cubes array
+    this.finalBossExplosionCubeIndex = 0; // Track which cube to explode next
+    this.finalBossExplosionDelay = 60; // Start with 1 second delay (60 frames at 60fps)
+    this.finalBossExplosionNextExplosionFrame = 0; // Frame when next cube should explode
     
     // Start the explosion sequence
     this.finalBossExplosionSequence();
@@ -734,11 +737,18 @@ export class EffectsManager {
         this.finalBossExplosionTimer = 0;
       }
     }
-    // Phase 2: Individual cube explosions (60-180 frames)
+    // Phase 2: Individual cube explosions with progressive delays
     else if (this.finalBossExplosionPhase === 1) {
-      // Explode one cube every 8 frames
-      if (this.finalBossExplosionTimer % 8 === 0 && this.finalBossExplosionCubes.length > 0) {
-        const cube = this.finalBossExplosionCubes.shift();
+      // Start the cube explosion sequence
+      if (this.finalBossExplosionTimer === 1) {
+        this.finalBossExplosionNextExplosionFrame = this.finalBossExplosionTimer + this.finalBossExplosionDelay;
+      }
+      
+      // Check if it's time to explode the next cube
+      if (this.finalBossExplosionCubeIndex < this.finalBossExplosionCubes.length && 
+          this.finalBossExplosionTimer >= this.finalBossExplosionNextExplosionFrame) {
+        
+        const cube = this.finalBossExplosionCubes[this.finalBossExplosionCubeIndex];
         if (cube) {
           // Get cube world position
           const worldPos = new THREE.Vector3();
@@ -753,12 +763,21 @@ export class EffectsManager {
           
           // Play explosion sound
           this.audioManager.playExplosion();
+          
+          // Move to next cube and reduce delay
+          this.finalBossExplosionCubeIndex++;
+          this.finalBossExplosionDelay = Math.max(12, this.finalBossExplosionDelay - 2); // Reduce by 2 frames (0.033s), minimum 12 frames (0.2s)
+          this.finalBossExplosionNextExplosionFrame = this.finalBossExplosionTimer + this.finalBossExplosionDelay;
         }
       }
       
-      if (this.finalBossExplosionTimer >= 120) {
-        this.finalBossExplosionPhase = 2;
-        this.finalBossExplosionTimer = 0;
+      // Check if all cubes have been exploded
+      if (this.finalBossExplosionCubeIndex >= this.finalBossExplosionCubes.length) {
+        // Wait a bit after the last cube explosion before moving to phase 3
+        if (this.finalBossExplosionTimer >= this.finalBossExplosionNextExplosionFrame + 60) { // Wait 1 second after last explosion
+          this.finalBossExplosionPhase = 2;
+          this.finalBossExplosionTimer = 0;
+        }
       }
     }
     // Phase 3: Final massive explosion (180-240 frames)
@@ -773,6 +792,14 @@ export class EffectsManager {
         // Remove the boss from scene
         this.scene.remove(this.finalBossExplosionBoss);
         
+        // Move to final delay phase
+        this.finalBossExplosionPhase = 3;
+        this.finalBossExplosionTimer = 0;
+      }
+    }
+    // Phase 4: Final delay before game complete (2 seconds)
+    else if (this.finalBossExplosionPhase === 3) {
+      if (this.finalBossExplosionTimer >= 120) { // 2 seconds at 60fps
         // Complete the sequence
         this.finalBossExplosionActive = false;
         if (this.finalBossExplosionCallback) {
@@ -785,6 +812,8 @@ export class EffectsManager {
     // Continue the sequence
     requestAnimationFrame(() => this.finalBossExplosionSequence());
   }
+
+
 
   createMassiveExplosion(position, color, scale, particleCount) {
     const explosionGroup = new THREE.Group();

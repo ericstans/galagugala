@@ -26,6 +26,7 @@ export const GAME_CONFIG = {
   
   // Collision thresholds
   COLLISION_THRESHOLD: 0.5,
+  BOSS_COLLISION_THRESHOLD: 1.0, // Double width for boss hitboxes
   PLAYER_COLLISION_THRESHOLD: 0.7,
   POWERUP_COLLISION_THRESHOLD: 0.6,
   
