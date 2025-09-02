@@ -36,6 +36,11 @@ export class AudioManager {
     this.bongoPatternPosition = 0; // Current position in pattern
     this.bongoPatternLength = 32; // 4 bars * 8 beats = 32 8th notes
     
+    // Arp system for plasma storms
+    this.arpActive = false; // Whether arp is currently active
+    this.arpPhase = 'warning'; // 'warning' or 'storm'
+    this.arpNoteIndex = 0; // Current note in chord progression
+    
     // Random voice selection
     this.selectedVoice = null;
     this.voiceSelected = false;
@@ -769,6 +774,83 @@ export class AudioManager {
     return bongo;
   }
 
+  createArp() {
+    if (!this.audioContext) return null;
+    if (!this.arpActive) return null; // Don't play if arp is no longer active
+    if (DEBUG) console.log('createArp() called');
+    
+    // Get current chord frequencies
+    const chordProgressions = {
+      'Cmin7': [130.81, 155.56, 174.61, 196.00], // C, Eb, F, G
+      'Fmin7': [174.61, 196.00, 220.00, 246.94], // F, G, A, Bb
+      'EbMaj': [155.56, 174.61, 196.00, 220.00], // Eb, F, G, A
+      'Bbmin7': [233.08, 261.63, 293.66, 329.63] // Bb, C, D, Eb
+    };
+    
+    const frequencies = chordProgressions[this.currentChord];
+    if (!frequencies) return null;
+    
+    // Create fat analog synth sound
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+    const saturationGain = this.audioContext.createGain();
+    
+    // Connect audio chain
+    oscillator.connect(saturationGain);
+    saturationGain.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.soundtrackBus);
+    
+    // Fat analog synth settings
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.setValueAtTime(frequencies[this.arpNoteIndex], this.audioContext.currentTime);
+    
+    // Saturation for fatness
+    saturationGain.gain.setValueAtTime(2.0, this.audioContext.currentTime);
+    
+    // Low-pass filter for warmth
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, this.audioContext.currentTime);
+    filter.Q.setValueAtTime(1.0, this.audioContext.currentTime);
+    
+    // Individual note envelope - longer duration for plasma storm
+    const noteDuration = 0.8; // Longer note duration
+    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.4, this.audioContext.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + noteDuration);
+    
+    // Start oscillator
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + noteDuration);
+    
+    // Move to next note in chord
+    this.arpNoteIndex = (this.arpNoteIndex + 1) % frequencies.length;
+    
+    if (DEBUG) console.log(`Arp playing note ${this.arpNoteIndex} of chord ${this.currentChord} at ${frequencies[this.arpNoteIndex]}Hz`);
+    
+    return oscillator;
+  }
+
+  startArp(phase = 'warning') {
+    if (DEBUG) console.log(`Starting arp in ${phase} phase`);
+    this.arpActive = true;
+    this.arpPhase = phase;
+    this.arpNoteIndex = 0;
+  }
+
+  stopArp() {
+    if (DEBUG) console.log('Stopping arp');
+    this.arpActive = false;
+    this.arpPhase = 'warning';
+    this.arpNoteIndex = 0;
+  }
+
+  setArpPhase(phase) {
+    if (DEBUG) console.log(`Setting arp phase to ${phase}`);
+    this.arpPhase = phase;
+  }
+
   generateBongoPattern() {
     // Generate a 4-bar pattern in 8th notes (32 total positions)
     // 40% density means about 13 hits out of 32 positions
@@ -1068,6 +1150,41 @@ export class AudioManager {
           }
         } else {
           if (DEBUG) console.log(`Bongos active but no pattern exists at beat ${this.globalBeatCounter}`);
+        }
+      }
+      
+      // Arp layer - only plays during plasma storms
+      if (this.arpActive) {
+        if (this.arpPhase === 'warning') {
+          // Play 8th notes during warning phase
+          if (this.globalBeatCounter % 1 === 0) { // Every beat
+            // Play on beat and off-beat (8th notes)
+            setTimeout(() => {
+              if (DEBUG) console.log(`Playing arp (warning phase) at beat ${this.globalBeatCounter}`);
+              this.createArp();
+            }, 0);
+            setTimeout(() => {
+              if (DEBUG) console.log(`Playing arp (warning phase) at beat ${this.globalBeatCounter} off-beat`);
+              this.createArp();
+            }, beatDuration / 2);
+          }
+        } else if (this.arpPhase === 'storm') {
+          // Play 8th note triplets during storm phase
+          if (this.globalBeatCounter % 1 === 0) { // Every beat
+            // Play three notes per beat (triplets)
+            setTimeout(() => {
+              if (DEBUG) console.log(`Playing arp (storm phase) at beat ${this.globalBeatCounter} - triplet 1`);
+              this.createArp();
+            }, 0);
+            setTimeout(() => {
+              if (DEBUG) console.log(`Playing arp (storm phase) at beat ${this.globalBeatCounter} - triplet 2`);
+              this.createArp();
+            }, beatDuration / 3);
+            setTimeout(() => {
+              if (DEBUG) console.log(`Playing arp (storm phase) at beat ${this.globalBeatCounter} - triplet 3`);
+              this.createArp();
+            }, (beatDuration * 2) / 3);
+          }
         }
       }
     }, beatDuration);

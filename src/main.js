@@ -97,6 +97,12 @@ class Game {
     this.enemies = new EnemyManager(this.engine.scene, this.currentLevel, this.engine, this.audio);
     if (DEBUG) console.log(`EnemyManager created with level ${this.currentLevel}`);
     
+    // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.) and clear enemies
+    if (this.currentLevel % 10 === 0) {
+      if (DEBUG) console.log(`Level ${this.currentLevel} detected in init - clearing enemies for plasma storm`);
+      this.enemies.clearAll();
+    }
+    
     this.setupAudioStart();
     this.setupGameStart();
     
@@ -193,6 +199,12 @@ class Game {
         
         this.gameStarted = true;
         if (DEBUG) console.log('Game started!');
+        
+        // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
+        if (this.currentLevel % 10 === 0) {
+          if (DEBUG) console.log(`Level ${this.currentLevel} detected on game start - starting plasma storm`);
+          this.startPlasmaStorm();
+        }
       }
     };
 
@@ -666,9 +678,15 @@ class Game {
     const currentChainCount = this.powerUps.getChainCount();
     this.overlay.updateChain(currentChainCount);
     
-    // Spawn new enemies for the next level with level-based scaling
-    if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
-    this.enemies.createEnemies(this.currentLevel, this.engine);
+    // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
+    if (this.currentLevel + 1 % 10 === 0) {
+      if (DEBUG) console.log(`Level ${this.currentLevel} detected - starting plasma storm instead of spawning enemies`);
+      this.startPlasmaStorm();
+    } else {
+      // Spawn new enemies for the next level with level-based scaling
+      if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
+      this.enemies.createEnemies(this.currentLevel, this.engine);
+    }
     
     // Update soundtrack for new level
     this.audio.updateSoundtrack(this.currentLevel);
@@ -679,6 +697,10 @@ class Game {
   startPlasmaStorm() {
     if (DEBUG) console.log(`Plasma Storm event triggered for level ${this.currentLevel}!`);
     
+    // Clear any existing enemies for plasma storm
+    this.enemies.clearAll();
+    if (DEBUG) console.log('Cleared existing enemies for plasma storm');
+    
     // Update level display immediately for plasma storm level
     this.overlay.updateLevel(this.currentLevel);
     
@@ -686,10 +708,18 @@ class Game {
     setTimeout(() => {
       this.audio.createRobotSpeech("Incoming Plasma Storm");
       
-      // Wait another 1.5 seconds, then start power-up flood
+      // Start arp in warning phase (8th notes) after voice announcement finishes
       setTimeout(() => {
+        if (DEBUG) console.log('Starting arp in warning phase (8th notes)');
+        this.audio.startArp('warning');
+      }, 2000); // Wait for voice to finish
+      
+      // Wait 4 seconds after voice announcement, then start power-up flood and switch arp to storm phase
+      setTimeout(() => {
+        if (DEBUG) console.log('Switching arp to storm phase (triplets) and starting power-up flood');
+        this.audio.setArpPhase('storm');
         this.floodPowerUps();
-      }, 1500);
+      }, 4000); // Give 8th notes 2 seconds to play before switching to triplets
     }, 500);
   }
 
@@ -714,10 +744,15 @@ class Game {
         // Schedule next spawn
         setTimeout(spawnPowerUp, spawnInterval);
       } else {
-        // All power-ups spawned, proceed to next level after a short delay
+        // All power-ups spawned, continue arp for 1 second, then stop and proceed to next level
+        if (DEBUG) console.log('Power-up spawning complete, continuing arp for 1 more second');
         setTimeout(() => {
-          this.proceedToNextLevel();
-        }, 5000);
+          if (DEBUG) console.log('Stopping arp and proceeding to next level');
+          this.audio.stopArp();
+          setTimeout(() => {
+            this.proceedToNextLevel();
+          }, 2000);
+        }, 1000); // Continue arp for 1 second after power-ups end
       }
     };
     
@@ -776,8 +811,14 @@ class Game {
     this.overlay.showLives(); // Show lives display for restart
     this.overlay.updateLives(this.lives); // Update lives display
     
-    // Spawn new enemies for the restart level
-    this.enemies.createEnemies(this.currentLevel, this.engine);
+    // Check if this is a plasma storm level (every 10 levels: 10, 20, 30, etc.)
+    if (this.currentLevel % 10 === 0) {
+      if (DEBUG) console.log(`Level ${this.currentLevel} detected on restart - starting plasma storm instead of spawning enemies`);
+      this.startPlasmaStorm();
+    } else {
+      // Spawn new enemies for the restart level
+      this.enemies.createEnemies(this.currentLevel, this.engine);
+    }
     
     // Start soundtrack for the restart level
     this.audio.updateSoundtrack(this.currentLevel);
