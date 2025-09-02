@@ -20,6 +20,8 @@ export class AudioManager {
     this.bpm = 128;
     this.beatInterval = null;
     this.masterGain = null;
+    this.soundtrackBus = null;
+    this.reverb = null;
     this.currentChord = null;
     this.bassBeatCounter = 0; // Track beats for chord changes
     
@@ -32,6 +34,41 @@ export class AudioManager {
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = this.masterVolume;
+      
+      // Create soundtrack bus with reverb
+      this.soundtrackBus = this.audioContext.createGain();
+      this.reverb = this.audioContext.createConvolver();
+      
+      // Create a simple reverb impulse response
+      const reverbLength = this.audioContext.sampleRate * 2; // 2 seconds
+      const impulse = this.audioContext.createBuffer(2, reverbLength, this.audioContext.sampleRate);
+      
+      for (let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        for (let i = 0; i < reverbLength; i++) {
+          channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2);
+        }
+      }
+      
+      this.reverb.buffer = impulse;
+      
+      // Create reverb mix controls
+      this.reverbDryGain = this.audioContext.createGain();
+      this.reverbWetGain = this.audioContext.createGain();
+      
+      // Connect soundtrack bus to both dry and wet paths
+      this.soundtrackBus.connect(this.reverbDryGain);
+      this.soundtrackBus.connect(this.reverb);
+      this.reverb.connect(this.reverbWetGain);
+      
+      // Both paths go to master gain
+      this.reverbDryGain.connect(this.masterGain);
+      this.reverbWetGain.connect(this.masterGain);
+      
+      // Set reverb mix (light reverb)
+      this.reverbDryGain.gain.value = 0.7; // Dry signal
+      this.reverbWetGain.gain.value = 0.3; // Wet signal
+      
       console.log('Audio system initialized successfully');
     } catch (e) {
       console.warn('Web Audio API not supported:', e);
@@ -351,7 +388,7 @@ export class AudioManager {
     oscillator.connect(filter);
     filter.connect(saturationGain);
     saturationGain.connect(gainNode);
-    gainNode.connect(this.masterGain);
+    gainNode.connect(this.soundtrackBus);
     
     oscillator.type = 'sine';
     // 808-style pitch envelope: start high, drop to sub-bass
@@ -385,7 +422,7 @@ export class AudioManager {
     
     oscillator.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(this.masterGain);
+    gainNode.connect(this.soundtrackBus);
     
     oscillator.type = 'square';
     oscillator.frequency.setValueAtTime(8000, this.audioContext.currentTime);
@@ -473,7 +510,7 @@ export class AudioManager {
     
     oscillator.connect(filter);
     filter.connect(gainNode);
-    gainNode.connect(this.masterGain);
+    gainNode.connect(this.soundtrackBus);
     
     oscillator.type = 'sawtooth';
     oscillator.frequency.setValueAtTime(noteFreq, this.audioContext.currentTime);
@@ -495,14 +532,14 @@ export class AudioManager {
   createChords() {
     if (!this.audioContext) return null;
     
-    // Define chord progressions (frequencies in Hz)
+    // Define chord progressions (frequencies in Hz) - C Dorian mode
     const chordProgressions = {
-      'CMaj': [261.63, 329.63, 392.00],      // C4, E4, G4
-      'CMaj7': [261.63, 329.63, 392.00, 466.16], // C4, E4, G4, Bb4
+      'Cmin': [261.63, 311.13, 392.00],      // C4, Eb4, G4
+      'Cmin7': [261.63, 311.13, 392.00, 466.16], // C4, Eb4, G4, Bb4
       'Dmin': [293.66, 349.23, 440.00],      // D4, F4, A4
-      'Emin': [329.63, 392.00, 493.88],      // E4, G4, B4
-      'FMaj7': [349.23, 440.00, 523.25, 659.25], // F4, A4, C5, E5
-      'GMaj7': [392.00, 493.88, 587.33, 739.99]  // G4, B4, D5, F#5
+      'EbMaj': [311.13, 392.00, 466.16],     // Eb4, G4, Bb4
+      'Fmin7': [349.23, 415.30, 523.25, 622.25], // F4, Ab4, C5, Eb5
+      'Gmin7': [392.00, 466.16, 587.33, 698.46]  // G4, Bb4, D5, F5
     };
     
     // Use the current chord or select a new one
@@ -528,7 +565,7 @@ export class AudioManager {
       saturationGain.connect(bitcrusher);
       bitcrusher.connect(lowpassFilter);
       lowpassFilter.connect(gainNode);
-      gainNode.connect(this.masterGain);
+      gainNode.connect(this.soundtrackBus);
       
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
@@ -555,11 +592,12 @@ export class AudioManager {
       lowpassFilter.Q.setValueAtTime(1, this.audioContext.currentTime);
       
       gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.1);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 2.1);
+      gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.05);
+      gainNode.gain.setValueAtTime(0.15, this.audioContext.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 2.05);
       
       oscillator.start(this.audioContext.currentTime);
-      oscillator.stop(this.audioContext.currentTime + 2.1);
+      oscillator.stop(this.audioContext.currentTime + 2.05);
       
       chord.push({ oscillator, bitcrusher });
     });

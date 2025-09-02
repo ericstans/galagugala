@@ -24,6 +24,14 @@ export class Player {
     console.log('Player created - no wings initially');
   }
 
+  hide() {
+    this.scene.remove(this.mesh);
+  }
+
+  show() {
+    this.scene.add(this.mesh);
+  }
+
   createSpaceship() {
     const shape = new THREE.Shape();
     

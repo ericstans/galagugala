@@ -39,6 +39,9 @@ export class EffectsManager {
     this.gameOverParticles = [];
     this.particleGeometry = new THREE.SphereGeometry(0.05, 8, 6);
     this.particleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    
+    // Intro text
+    this.introText = null;
   }
 
   createExplosion(position) {
@@ -295,6 +298,15 @@ export class EffectsManager {
           [0, 4], [1, 4], [2, 4], [3, 4],         // top
           [0, 2], [1, 2], [2, 2], [3, 2],         // middle
           [3, 3], [3, 1], [4, 0]                  // right leg
+        ],
+        'L': [
+          [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
+          [0, 0], [1, 0], [2, 0], [3, 0]          // bottom
+        ],
+        'U': [
+          [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
+          [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], // right
+          [0, 0], [1, 0], [2, 0], [3, 0]          // bottom
         ]
       };
       
@@ -331,6 +343,90 @@ export class EffectsManager {
     
     this.scene.add(textGroup);
     this.gameOverText = textGroup;
+  }
+
+  createIntroText() {
+    // Create "GALAGUGALA" text using the same style as GAME OVER
+    const textGroup = new THREE.Group();
+    
+    // Create box geometry and material for letters (same as GAME OVER)
+    const boxGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+    const letterMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    // Helper function to create a letter from multiple boxes
+    const createLetter = (letter, x, y) => {
+      const letterGroup = new THREE.Group();
+      
+      // Define letter patterns (simplified block letters)
+      const patterns = {
+        'G': [
+          [0, 0], [1, 0], [2, 0], [3, 0], // top
+          [0, 1], [0, 2], [0, 3], [0, 4], // left
+          [0, 4], [1, 4], [2, 4], [3, 4], // bottom
+          [3, 4], [3, 2], [3, 1], // right
+          [2, 2], [3, 2]                  // middle right
+        ],
+        'A': [
+          [0, 4], [1, 4], [2, 4], [3, 4], // top
+          [0, 3], [0, 2], [0, 1], [0, 0], // left
+          [3, 3], [3, 2], [3, 1], [3, 0], // right
+          [0, 2], [1, 2], [2, 2], [3, 2]  // middle
+        ],
+        'L': [
+          [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
+          [0, 0], [1, 0], [2, 0], [3, 0]          // bottom
+        ],
+        'U': [
+          [0, 0], [0, 1], [0, 2], [0, 3], [0, 4], // left
+          [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], // right
+          [0, 0], [1, 0], [2, 0], [3, 0]          // bottom
+        ]
+      };
+      
+      const pattern = patterns[letter] || [];
+      pattern.forEach(([px, py]) => {
+        const box = new THREE.Mesh(boxGeometry, letterMaterial.clone());
+        box.position.set(px * 0.2, py * 0.2, 0);
+        letterGroup.add(box);
+      });
+      
+      letterGroup.position.set(x, y, 0);
+      return letterGroup;
+    };
+    
+    // Create each letter with proper centering
+    // Total width is approximately 9 units (10 letters + 9 spaces)
+    // Center offset: -4.5 to center the text
+    const centerOffset = -4.75;
+    
+    // "GALAGUGALA" - all letters
+    textGroup.add(createLetter('G', centerOffset + 0, 0));
+    textGroup.add(createLetter('A', centerOffset + 1, 0));
+    textGroup.add(createLetter('L', centerOffset + 2, 0));
+    textGroup.add(createLetter('A', centerOffset + 3, 0));
+    textGroup.add(createLetter('G', centerOffset + 4, 0));
+    textGroup.add(createLetter('U', centerOffset + 5, 0));
+    textGroup.add(createLetter('G', centerOffset + 6, 0));
+    textGroup.add(createLetter('A', centerOffset + 7, 0));
+    textGroup.add(createLetter('L', centerOffset + 8, 0));
+    textGroup.add(createLetter('A', centerOffset + 9, 0));
+    
+    // Center the text group on the canvas
+    textGroup.position.set(0, 0, 0);
+    
+    this.scene.add(textGroup);
+    this.introText = textGroup;
+  }
+
+  removeIntroText() {
+    if (this.introText) {
+      this.scene.remove(this.introText);
+      this.introText = null;
+    }
   }
 
   createGameOverParticles() {
@@ -445,6 +541,9 @@ export class EffectsManager {
     
     // Clear game over animation
     this.clearGameOverAnimation();
+    
+    // Clear intro text
+    this.removeIntroText();
     
     // Reset level complete animation
     this.levelCompleteAnimation = null;

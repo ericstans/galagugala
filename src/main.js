@@ -18,6 +18,9 @@ class Game {
     
     this.player = new Player(this.engine.scene);
     
+    // Hide player during intro screen
+    this.player.hide();
+    
     // Level progression - check URL parameter
     this.currentLevel = this.getLevelFromURL();
     console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
@@ -32,6 +35,7 @@ class Game {
     
     this.audioStarted = false;
     this.gameStarted = false;
+    this.introRenderId = null;
   }
 
   getLevelFromURL() {
@@ -77,6 +81,32 @@ class Game {
     
     // Show start overlay
     this.overlay.showStartOverlay();
+    
+    // Create intro text
+    this.effects.createIntroText();
+    
+    // Start minimal render loop for intro screen
+    this.startIntroRenderLoop();
+  }
+  
+  startIntroRenderLoop() {
+    // Simple render loop for intro screen with waving animation
+    const render = () => {
+      if (!this.gameStarted) {
+        // Animate enemies with waving effect during intro
+        this.enemies.updateIntroAnimation();
+        this.engine.render();
+        this.introRenderId = requestAnimationFrame(render);
+      }
+    };
+    this.introRenderId = requestAnimationFrame(render);
+  }
+  
+  stopIntroRenderLoop() {
+    if (this.introRenderId) {
+      cancelAnimationFrame(this.introRenderId);
+      this.introRenderId = null;
+    }
   }
   
   setupAudioStart() {
@@ -101,6 +131,15 @@ class Game {
         // Hide start overlay
         this.overlay.hideStartOverlay();
         
+        // Stop intro render loop
+        this.stopIntroRenderLoop();
+        
+        // Remove intro text
+        this.effects.removeIntroText();
+        
+        // Show player ship
+        this.player.show();
+        
         // Start audio
         if (!this.audioStarted && this.audio.audioContext) {
           this.audio.audioContext.resume();
@@ -118,8 +157,10 @@ class Game {
         // Set keyboard focus to the game canvas
         this.engine.renderer.domElement.focus();
         
-        // Show score display
+        // Show score and level displays
         this.overlay.showScore();
+        this.overlay.showLevel();
+        this.overlay.updateLevel(this.currentLevel);
         
         this.gameStarted = true;
         console.log('Game started!');
@@ -162,6 +203,9 @@ class Game {
     const effectsResult = this.effects.update();
     const completedExplosion = effectsResult && effectsResult.explosion ? effectsResult.explosion : null;
     const levelCompleteFinished = effectsResult && effectsResult.levelCompleteFinished;
+    
+    // Update score popups
+    this.overlay.updateScorePopups();
     const levelCompleteColor = effectsResult && effectsResult.levelCompleteColor;
     const gameOverFinished = effectsResult && effectsResult.gameOverFinished;
     
@@ -202,6 +246,9 @@ class Game {
       const enemyScore = this.calculateEnemyScore(chainCount);
       this.addScore(enemyScore);
       
+      // Show score popup at enemy position
+      this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
+      
       // Remove enemy with power-up callback
       this.enemies.removeEnemy(enemy, (position) => {
         this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position);
@@ -229,6 +276,9 @@ class Game {
       const chainCount = this.powerUps.getChainCount();
       const enemyScore = this.calculateEnemyScore(chainCount);
       this.addScore(enemyScore);
+      
+      // Show score popup at enemy position
+      this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
       
       // Remove enemy with power-up callback
       this.enemies.removeEnemy(enemy, (position) => {
@@ -282,6 +332,9 @@ class Game {
         const chainCount = this.powerUps.getChainCount();
         const enemyScore = this.calculateEnemyScore(chainCount);
         this.addScore(enemyScore);
+        
+        // Show score popup at enemy position
+        this.overlay.createScorePopup(enemyScore, enemy.position, this.engine.camera, this.engine.renderer);
         
         // Remove enemy with power-up callback
         this.enemies.removeEnemy(enemy, (position) => {
@@ -369,6 +422,9 @@ class Game {
     this.currentLevel++;
     console.log(`Starting level ${this.currentLevel}...`);
     
+    // Update level display
+    this.overlay.updateLevel(this.currentLevel);
+    
     // Reset game state
     this.engine.resetGameState();
     
@@ -403,6 +459,9 @@ class Game {
     this.currentLevel = this.getLevelFromURL();
     console.log(`Restarting at level ${this.currentLevel} (from URL parameter)`);
     
+    // Update level display
+    this.overlay.updateLevel(this.currentLevel);
+    
     // Reset game state
     this.engine.resetGameState();
     
@@ -412,12 +471,18 @@ class Game {
     // Reset player position and state (remove wings on game restart)
     this.player.reset(true);
     
+    // Show player ship
+    this.player.show();
+    
     // Clear all enemies and power-ups
     this.enemies.clearAll();
     this.powerUps.clearAll();
     
     // Silently hide chain display for restart (no "CHAIN BROKEN" text)
     this.overlay.silentHideChain();
+    
+    // Clear all score popups
+    this.overlay.clearAllScorePopups();
     
     // Reset score
     this.score = 0;

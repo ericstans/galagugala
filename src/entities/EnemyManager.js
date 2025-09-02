@@ -42,10 +42,18 @@ export class EnemyManager {
     const dynamicYSpacing = totalRows > 1 ? availableHeight / (totalRows - 1) : GAME_CONFIG.ENEMY_Y_SPACING;
     const clampedYSpacing = Math.min(dynamicYSpacing, GAME_CONFIG.ENEMY_Y_SPACING); // Don't exceed original spacing
     
+    // Calculate dynamic X spacing to keep formation within player's reach
+    // Player can move from x = -6 to x = 6, so max formation width should be ≤ 12 units
+    const maxFormationWidth = 12.0; // Match player's movement range
+    const dynamicXSpacing = totalCols > 1 ? maxFormationWidth / (totalCols - 1) : GAME_CONFIG.ENEMY_X_SPACING;
+    const clampedXSpacing = Math.min(dynamicXSpacing, GAME_CONFIG.ENEMY_X_SPACING); // Don't exceed original spacing
+    
     // Calculate dynamic enemy size based on formation size
-    const maxFormationWidth = (totalCols - 1) * GAME_CONFIG.ENEMY_X_SPACING;
-    const maxFormationHeight = (totalRows - 1) * clampedYSpacing;
-    const formationArea = maxFormationWidth * maxFormationHeight;
+    const actualFormationWidth = (totalCols - 1) * clampedXSpacing;
+    const actualFormationHeight = (totalRows - 1) * clampedYSpacing;
+    const formationArea = actualFormationWidth * actualFormationHeight;
+    
+    console.log(`X spacing: dynamic=${dynamicXSpacing.toFixed(2)}, clamped=${clampedXSpacing.toFixed(2)}, formation width=${actualFormationWidth.toFixed(2)}`);
     
     // Scale enemy size inversely with formation area (larger formations = smaller enemies)
     const baseEnemySize = 0.7;
@@ -65,7 +73,7 @@ export class EnemyManager {
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
         const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
-        const formationX = (col - totalCols / 2 + 0.5) * GAME_CONFIG.ENEMY_X_SPACING;
+        const formationX = (col - totalCols / 2 + 0.5) * clampedXSpacing;
         const formationY = row * clampedYSpacing + bottomMargin;
         enemy.position.set(formationX, formationY, 0);
         enemy.userData = {
@@ -88,6 +96,17 @@ export class EnemyManager {
         this.initialColumnStructure[formationX]++;
       }
     }
+  }
+
+  updateIntroAnimation() {
+    // Apply waving effect to enemies during intro screen
+    this.enemies.forEach(enemy => {
+      if (enemy.userData.state === 'formation') {
+        // Small wiggle for life (same as in update method)
+        enemy.position.x = enemy.userData.formationX + Math.sin(Date.now() * 0.001 + enemy.userData.formationY) * 0.1;
+        enemy.position.y = enemy.userData.formationY + Math.cos(Date.now() * 0.001 + enemy.userData.formationX) * 0.05;
+      }
+    });
   }
 
   update(player, gameState, audioManager) {
@@ -136,18 +155,57 @@ export class EnemyManager {
           const b = p1.clone().lerp(p2, t);
           enemy.position.copy(a.lerp(b, t));
         } else {
-          // If missed, return to formation
+          // Dive complete, start waiting off-screen at bottom
+          enemy.userData.state = 'waiting';
+          enemy.userData.waitTime = 0;
+          enemy.userData.waitDuration = 18 + Math.random() * 102; // 0.3-2 seconds (18-120 frames at 60fps)
+        }
+      } else if (enemy.userData.state === 'waiting') {
+        // Wait off-screen at bottom before teleporting
+        enemy.userData.waitTime++;
+        if (enemy.userData.waitTime >= enemy.userData.waitDuration) {
+          // Wait complete, teleport to top of screen
+          enemy.userData.state = 'teleporting';
+          enemy.userData.teleportTime = 0;
+          enemy.userData.teleportDuration = 1; // Instant teleport (1 frame)
+          
+          // Teleport to above the top of the screen
+          enemy.position.set(enemy.userData.formationX, 8, 0); // Above the top
+        }
+      } else if (enemy.userData.state === 'teleporting') {
+        // Teleport is instant, move to returning state
+        enemy.userData.teleportTime++;
+        if (enemy.userData.teleportTime >= enemy.userData.teleportDuration) {
+          // Start returning to formation from the top
           enemy.userData.state = 'returning';
           enemy.userData.returnTime = 0;
-          enemy.userData.returnDuration = 60;
+          enemy.userData.returnDuration = 90 + Math.random() * 30; // 1.5-2 seconds
           enemy.userData.returnStart = enemy.position.clone();
+          
+          // Calculate side offset once for smooth curve
+          enemy.userData.returnSideOffset = (Math.random() - 0.5) * 2; // Small random offset
         }
       } else if (enemy.userData.state === 'returning') {
-        // Move back to formation
+        // Move back to formation from the side
         enemy.userData.returnTime++;
         const t = enemy.userData.returnTime / enemy.userData.returnDuration;
+        
         if (t < 1) {
-          enemy.position.lerpVectors(enemy.userData.returnStart, new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0), t);
+          // Create a curved path from the top to formation
+          const start = enemy.userData.returnStart;
+          const end = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
+          
+          // Create a control point for the curve (slightly to the side for natural arc)
+          const mid = new THREE.Vector3(
+            enemy.userData.formationX + enemy.userData.returnSideOffset,
+            enemy.userData.formationY + 2, // Mid-point between top and formation
+            0
+          );
+          
+          // Quadratic Bezier interpolation for smooth curve
+          const a = start.clone().lerp(mid, t);
+          const b = mid.clone().lerp(end, t);
+          enemy.position.copy(a.lerp(b, t));
         } else {
           enemy.userData.state = 'formation';
           enemy.position.set(enemy.userData.formationX, enemy.userData.formationY, 0);
@@ -188,39 +246,37 @@ export class EnemyManager {
   initiateSwoop(enemy, swoopType, player, audioManager) {
     enemy.userData.state = 'diving';
     enemy.userData.diveTime = 0;
-    enemy.userData.diveDuration = 90 + Math.random() * 60;
+    enemy.userData.diveDuration = 120 + Math.random() * 60; // Longer dive to go past player
     
     const start = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
     let end, mid;
     
     if (swoopType < 0.3) {
-      // Direct attack - aim at player's current position
-      end = new THREE.Vector3(player.position.x, player.position.y, 0);
-      mid = start.clone().lerp(end, 0.5);
-      mid.x += (Math.random() - 0.5) * 2;
-    } else if (swoopType < 0.6) {
-      // Predictive attack - aim where player will be
-      const playerVelocity = new THREE.Vector3(0, 0, 0); // Could track player movement
-      const predictionTime = 30; // frames ahead
-      end = new THREE.Vector3(
-        player.position.x + playerVelocity.x * predictionTime,
-        player.position.y + playerVelocity.y * predictionTime,
-        0
-      );
+      // Direct attack - go past player and off screen
+      end = new THREE.Vector3(player.position.x, player.position.y - 4, 0); // Go past player
       mid = start.clone().lerp(end, 0.4);
+      mid.x += (Math.random() - 0.5) * 2;
+      mid.y -= 1; // Curve down
+    } else if (swoopType < 0.6) {
+      // Predictive attack - aim past where player will be
+      const sideOffset = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+      end = new THREE.Vector3(player.position.x + sideOffset, player.position.y - 5, 0);
+      mid = start.clone().lerp(end, 0.3);
       mid.x += (Math.random() - 0.5) * 3;
+      mid.y -= 2; // Deeper curve
     } else if (swoopType < 0.8) {
-      // Side attack - swoop from the side
-      const sideOffset = (Math.random() - 0.5) * 8; // -4 to 4
-      end = new THREE.Vector3(player.position.x + sideOffset, player.position.y - 2, 0);
+      // Side attack - swoop past player from the side
+      const sideOffset = (Math.random() - 0.5) * 6; // -3 to 3
+      end = new THREE.Vector3(player.position.x + sideOffset, player.position.y - 3, 0);
       mid = new THREE.Vector3(
-        start.x + (end.x - start.x) * 0.3,
-        start.y - 1,
+        start.x + (end.x - start.x) * 0.2,
+        start.y - 1.5,
         0
       );
     } else {
-      // Circular attack - swoop in an arc
-      end = new THREE.Vector3(player.position.x, player.position.y, 0);
+      // Circular attack - swoop in a wide arc past player
+      const arcOffset = (Math.random() - 0.5) * 8; // -4 to 4
+      end = new THREE.Vector3(player.position.x + arcOffset, player.position.y - 4, 0);
       mid = new THREE.Vector3(
         start.x + (Math.random() - 0.5) * 6,
         start.y - 2,
@@ -242,17 +298,14 @@ export class EnemyManager {
     });
     formationCenter.divideScalar(group.length);
     
-    // Target is player position
-    const target = new THREE.Vector3(player.position.x, player.position.y, 0);
-    
-    // Calculate formation movement vector
-    const formationMovement = target.clone().sub(formationCenter);
+    // Target is past the player and off the bottom of the screen
+    const target = new THREE.Vector3(player.position.x, player.position.y - 4, 0);
     
     // Set up each enemy in the formation
     group.forEach((enemy, index) => {
       enemy.userData.state = 'diving';
       enemy.userData.diveTime = 0;
-      enemy.userData.diveDuration = 90 + Math.random() * 60;
+      enemy.userData.diveDuration = 120 + Math.random() * 60; // Longer dive to go past player
       
       // Calculate relative position within formation
       const relativePos = new THREE.Vector3(
@@ -264,12 +317,13 @@ export class EnemyManager {
       // Start position (current formation position)
       const start = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
       
-      // End position (maintains relative position in formation)
+      // End position (maintains relative position in formation, but goes past player)
       const end = target.clone().add(relativePos);
       
-      // Mid point for curve (formation moves together)
-      const mid = start.clone().lerp(end, 0.5);
+      // Mid point for curve (formation moves together, curves down)
+      const mid = start.clone().lerp(end, 0.4);
       mid.x += (Math.random() - 0.5) * 1; // Small random variation
+      mid.y -= 1; // Curve down to go past player
       
       enemy.userData.diveCurve = [start, mid, end];
       enemy.userData.formationLeader = leader; // Reference to leader for coordination

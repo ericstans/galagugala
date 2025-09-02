@@ -4,8 +4,11 @@ export class OverlayManager {
     this.chainDisplay = this.createChainDisplay();
     this.startOverlay = this.createStartOverlay();
     this.scoreDisplay = this.createScoreDisplay();
+    this.levelDisplay = this.createLevelDisplay();
     this.chainFadeTimeout = null; // Track fade-out timeout
     this.lastChainCount = 0; // Track previous chain count to detect breaks
+    this.chainBrokenAnimating = false; // Track if "CHAIN BROKEN" is currently animating
+    this.scorePopups = []; // Track active score popups
     this.setupEventListeners();
   }
 
@@ -97,6 +100,30 @@ export class OverlayManager {
     return scoreDisplay;
   }
 
+  createLevelDisplay() {
+    let levelDisplay = document.getElementById('level-display');
+    if (!levelDisplay) {
+      levelDisplay = document.createElement('div');
+      levelDisplay.id = 'level-display';
+      levelDisplay.style.position = 'fixed';
+      levelDisplay.style.top = '60px'; // Below the score display
+      levelDisplay.style.right = '20px';
+      levelDisplay.style.fontSize = '1.5rem';
+      levelDisplay.style.fontWeight = 'bold';
+      levelDisplay.style.color = '#00fffc';
+      levelDisplay.style.fontFamily = 'Courier New, monospace';
+      levelDisplay.style.textAlign = 'right';
+      levelDisplay.style.textShadow = '0 0 10px #00fffc, 0 0 20px #00fffc';
+      levelDisplay.style.zIndex = '400'; // Same as score display
+      levelDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
+      levelDisplay.style.userSelect = 'none';
+      levelDisplay.style.display = 'none'; // Initially hidden
+      levelDisplay.textContent = 'LEVEL 1';
+      document.body.appendChild(levelDisplay);
+    }
+    return levelDisplay;
+  }
+
   createStartOverlay() {
     let startOverlay = document.getElementById('start-overlay');
     if (!startOverlay) {
@@ -110,7 +137,7 @@ export class OverlayManager {
       startOverlay.style.display = 'flex';
       startOverlay.style.justifyContent = 'center';
       startOverlay.style.alignItems = 'center';
-      startOverlay.style.background = 'rgba(0,0,0,0.9)';
+      startOverlay.style.background = 'transparent';
       startOverlay.style.zIndex = '2000';
       startOverlay.style.flexDirection = 'column';
       startOverlay.style.color = '#00fffc';
@@ -120,10 +147,9 @@ export class OverlayManager {
       startOverlay.style.cursor = 'pointer';
       startOverlay.style.userSelect = 'none';
       startOverlay.innerHTML = `
-        <div style="font-size:4rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 0 60px #00fffc;">GALAGUGALA</div>
-        <div style="font-size:4rem;opacity:0.8;">WASD / arrows to move</div>
-        <div style="font-size:4rem;opacity:0.8;">Z / SPACE to shoot</div>
-        <div style="font-size:4rem;margin-bottom:1rem;">Enter to Start</div>
+        <div style="font-size:2rem;opacity:0.8;margin-top:16rem;">WASD / arrows to move</div>
+        <div style="font-size:2rem;opacity:0.8;">Z / SPACE to shoot</div>
+        <div style="font-size:2rem;margin-bottom:1rem;">Enter to Start</div>
       `;
       document.body.appendChild(startOverlay);
     }
@@ -244,6 +270,9 @@ export class OverlayManager {
       clearTimeout(this.chainFadeTimeout);
     }
     
+    // Set flag to indicate "CHAIN BROKEN" animation is starting
+    this.chainBrokenAnimating = true;
+    
     // Show "CHAIN BROKEN" text instead of fading out the number
     this.chainDisplay.textContent = 'CHAIN\nBROKEN';
     this.chainDisplay.style.display = 'block';
@@ -257,18 +286,22 @@ export class OverlayManager {
       this.chainFadeTimeout = setTimeout(() => {
         this.chainDisplay.style.display = 'none';
         this.chainFadeTimeout = null;
+        this.chainBrokenAnimating = false; // Animation complete
       }, 500); // Match the transition duration
     }, 200); // Brief pause to show the text
   }
 
   updateChain(chainCount) {
     if (chainCount > 2) {
-      this.showChain(chainCount);
+      // Only show new chain if "CHAIN BROKEN" animation is not in progress
+      if (!this.chainBrokenAnimating) {
+        this.showChain(chainCount);
+      }
     } else {
       // Only show "CHAIN BROKEN" if we had a chain before (not at game start)
-      if (this.lastChainCount > 2) {
+      if (this.lastChainCount > 2 && !this.chainBrokenAnimating) {
         this.hideChain();
-      } else {
+      } else if (!this.chainBrokenAnimating) {
         // Just hide the display without showing "CHAIN BROKEN" text
         this.chainDisplay.style.display = 'none';
         // Cancel any pending fade-out timeouts
@@ -294,7 +327,8 @@ export class OverlayManager {
     // Just hide the display immediately
     this.chainDisplay.style.display = 'none';
     
-    // Reset the last chain count to prevent false "CHAIN BROKEN" messages
+    // Reset animation flag and last chain count
+    this.chainBrokenAnimating = false;
     this.lastChainCount = 0;
   }
 
@@ -305,6 +339,19 @@ export class OverlayManager {
 
   hideScore() {
     this.scoreDisplay.style.display = 'none';
+  }
+
+  // Level display methods
+  showLevel() {
+    this.levelDisplay.style.display = 'block';
+  }
+
+  hideLevel() {
+    this.levelDisplay.style.display = 'none';
+  }
+
+  updateLevel(level) {
+    this.levelDisplay.textContent = `LEVEL ${level}`;
   }
 
   updateScore(score) {
@@ -335,6 +382,81 @@ export class OverlayManager {
       html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
     }
     this.scoreDisplay.innerHTML = html;
+  }
+
+  // Score popup methods
+  createScorePopup(score, worldPosition, camera, renderer) {
+    // Convert 3D world position to 2D screen coordinates
+    const vector = worldPosition.clone();
+    vector.project(camera);
+    
+    const x = (vector.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+    const y = (vector.y * -0.5 + 0.5) * renderer.domElement.clientHeight;
+    
+    // Create popup element
+    const popup = document.createElement('div');
+    popup.style.position = 'fixed';
+    popup.style.left = x + 'px';
+    popup.style.top = y + 'px';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.fontSize = '1.5rem';
+    popup.style.fontWeight = 'bold';
+    popup.style.color = '#00fffc';
+    popup.style.fontFamily = 'Courier New, monospace';
+    popup.style.textAlign = 'center';
+    popup.style.textShadow = '0 0 10px #00fffc, 0 0 20px #00fffc';
+    popup.style.zIndex = '600'; // Above other UI elements
+    popup.style.pointerEvents = 'none';
+    popup.style.userSelect = 'none';
+    popup.style.opacity = '1';
+    popup.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+    popup.textContent = '+' + score.toString();
+    
+    document.body.appendChild(popup);
+    
+    // Store popup data
+    const popupData = {
+      element: popup,
+      startTime: Date.now(),
+      startY: y,
+      score: score
+    };
+    
+    this.scorePopups.push(popupData);
+    
+    // Start animation
+    setTimeout(() => {
+      popup.style.transform = 'translate(-50%, -50%) translateY(-30px)';
+      popup.style.opacity = '0';
+    }, 50);
+    
+    // Remove after animation
+    setTimeout(() => {
+      if (popup.parentNode) {
+        popup.parentNode.removeChild(popup);
+      }
+      const index = this.scorePopups.indexOf(popupData);
+      if (index > -1) {
+        this.scorePopups.splice(index, 1);
+      }
+    }, 1000);
+  }
+
+  updateScorePopups() {
+    // Update existing popups (for any additional animations)
+    this.scorePopups.forEach(popupData => {
+      const elapsed = Date.now() - popupData.startTime;
+      // Could add additional effects here if needed
+    });
+  }
+
+  clearAllScorePopups() {
+    this.scorePopups.forEach(popupData => {
+      if (popupData.element.parentNode) {
+        popupData.element.parentNode.removeChild(popupData.element);
+      }
+    });
+    this.scorePopups = [];
   }
 
   // Start overlay methods

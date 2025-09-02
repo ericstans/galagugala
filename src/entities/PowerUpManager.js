@@ -75,7 +75,7 @@ export class PowerUpManager {
     powerUp.userData = {
       pulseTime: Math.random() * Math.PI * 2,
       pulseSpeed: 0.1,
-      fallSpeed: 0.05,
+      fallSpeed: 0.05 * (0.9 + Math.random() * 0.1), // 10% randomness: 0.045 to 0.05
       energyRing: energyRing, // Store reference to ring for animation
       type: type // Store power-up type
     };
@@ -257,8 +257,23 @@ export class PowerUpManager {
     } else {
       // Player missing wings, can spawn red power-ups
       const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
-      powerUpType = shouldSpawnRed ? 'red' : 'blue';
-      if (debug) console.log(`Player missing wings, spawning ${powerUpType} power-up (red chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
+      
+      // Check if a red power-up is already on screen
+      const hasRedPowerUp = this.powerUps.some(powerUp => powerUp.userData.type === 'red');
+      
+      if (shouldSpawnRed && !hasRedPowerUp) {
+        powerUpType = 'red';
+        if (debug) console.log('Spawning red power-up (no red power-up on screen)');
+      } else {
+        powerUpType = 'blue';
+        if (debug) {
+          if (hasRedPowerUp) {
+            console.log('Spawning blue power-up (red power-up already on screen)');
+          } else {
+            console.log('Spawning blue power-up (red chance not met)');
+          }
+        }
+      }
     }
     
     this.createPowerUp(powerUpType, position);
