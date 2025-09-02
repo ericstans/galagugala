@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 export class AudioManager {
   constructor() {
@@ -777,14 +777,15 @@ export class AudioManager {
   createArp() {
     if (!this.audioContext) return null;
     if (!this.arpActive) return null; // Don't play if arp is no longer active
-    if (DEBUG) console.log('createArp() called');
     
     // Get current chord frequencies
     const chordProgressions = {
       'Cmin7': [130.81, 155.56, 174.61, 196.00], // C, Eb, F, G
       'Fmin7': [174.61, 196.00, 220.00, 246.94], // F, G, A, Bb
       'EbMaj': [155.56, 174.61, 196.00, 220.00], // Eb, F, G, A
-      'Bbmin7': [233.08, 261.63, 293.66, 329.63] // Bb, C, D, Eb
+      'Bbmin7': [233.08, 261.63, 293.66, 329.63], // Bb, C, D, Eb
+      'Dmin': [146.83, 174.61, 196.00, 220.00], // D, F, G, A
+      'Gmin7': [196.00, 220.00, 246.94, 293.66] // G, Bb, C, D
     };
     
     const frequencies = chordProgressions[this.currentChord];
