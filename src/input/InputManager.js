@@ -33,6 +33,14 @@ export class InputManager {
     return this.isPressed('KeyP');
   }
 
+  isManualRedPowerUpPressed() {
+    return this.isPressed('KeyR');
+  }
+
+  isInvulnerabilityTogglePressed() {
+    return this.isPressed('KeyI');
+  }
+
   isEnterPressed() {
     return this.isPressed('Enter');
   }

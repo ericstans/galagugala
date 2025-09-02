@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { GameEngine } from './core/GameEngine.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { Player } from './entities/Player.js';
@@ -17,7 +18,7 @@ class Game {
     
     this.player = new Player(this.engine.scene);
     this.enemies = new EnemyManager(this.engine.scene);
-    this.powerUps = new PowerUpManager(this.engine.scene);
+    this.powerUps = new PowerUpManager(this.engine.scene, this.enemies);
     this.effects = new EffectsManager(this.engine.scene);
     
     this.audioStarted = false;
@@ -52,18 +53,24 @@ class Game {
     if (playerResult && playerResult.manualPowerUp) {
       this.powerUps.createPowerUp();
     }
+    if (playerResult && playerResult.manualRedPowerUp) {
+      this.powerUps.createPowerUp('red');
+    }
     
     // Update enemies
     this.enemies.update(this.player, gameState, this.audio);
     
     // Update power-ups
-    this.powerUps.update(gameState);
+    this.powerUps.update(gameState, this.player);
     
     // Update effects
     const completedExplosion = this.effects.update();
     
     // Check collisions
     this.checkCollisions();
+    
+    // Update UI status
+    this.overlay.updateInvulnerabilityStatus(this.player.isInvulnerable);
     
     // Check game state
     this.checkGameState(completedExplosion);
@@ -72,7 +79,7 @@ class Game {
   checkCollisions() {
     const gameState = this.engine.getGameState();
     
-    // Bullet-enemy collision
+    // Main bullet-enemy collision
     const bulletCollision = CollisionManager.checkBulletEnemyCollision(
       this.player.bullets, 
       this.enemies.enemies, 
@@ -92,12 +99,40 @@ class Game {
       this.audio.playHit();
     }
     
+    // Wing bullet-enemy collision
+    const wingBulletCollision = CollisionManager.checkWingBulletEnemyCollision(
+      this.player.wingBullets,
+      this.enemies.enemies,
+      this.audio
+    );
+    
+    if (wingBulletCollision) {
+      const { bulletIndex, enemyIndex, bullet, enemy } = wingBulletCollision;
+      
+      // Remove bullet and enemy
+      this.engine.scene.remove(bullet);
+      this.engine.scene.remove(enemy);
+      
+      // Remove from arrays (use splice to remove by index)
+      if (bulletIndex >= 0 && bulletIndex < this.player.wingBullets.length) {
+        this.player.wingBullets.splice(bulletIndex, 1);
+      }
+      if (enemyIndex >= 0 && enemyIndex < this.enemies.enemies.length) {
+        this.enemies.enemies.splice(enemyIndex, 1);
+      }
+      
+      // Play hit sound
+      this.audio.playHit();
+    }
+    
     // Player-power-up collision
     if (gameState.isPlaying && !gameState.playerDestroyed) {
       const powerUpResult = this.powerUps.checkCollisions(this.player, this.audio);
       if (powerUpResult) {
-        // Power-up effects can be handled here
-        console.log(`Power-up effect: ${powerUpResult.type}`);
+        // Handle wing upgrades
+        if (powerUpResult.type === 'red' && powerUpResult.wingsAdded) {
+          console.log('Wing upgrade: Both wings added!');
+        }
       }
     }
   }
@@ -105,27 +140,57 @@ class Game {
   checkGameState(completedExplosion) {
     const gameState = this.engine.getGameState();
     
-    // Game over (enemy reaches player)
-    const enemyCollision = CollisionManager.checkPlayerEnemyCollision(
-      this.player, 
-      this.enemies.enemies
-    );
+    // Check wing-enemy collisions first (only if not invulnerable)
+    if (!this.player.isInvulnerable) {
+      const wingCollision = CollisionManager.checkWingEnemyCollision(
+        this.player,
+        this.enemies.enemies
+      );
+      
+      if (wingCollision && !gameState.playerDestroyed) {
+        const { wing, enemy, side } = wingCollision;
+        
+        // Create explosion at wing position
+        const wingWorldPos = new THREE.Vector3();
+        wing.getWorldPosition(wingWorldPos);
+        this.effects.createExplosion(wingWorldPos);
+        
+        // Remove enemy
+        this.enemies.removeEnemy(enemy);
+        
+        // Destroy wing
+        this.player.destroyWing(wing);
+        
+        // Play explosion sound
+        this.audio.playExplosion();
+        
+        console.log(`${side} wing destroyed!`);
+      }
+    }
     
-    if (enemyCollision && !gameState.playerDestroyed) {
-      // Mark player as destroyed
-      this.engine.setGameState({
-        playerDestroyed: true,
-        isPlaying: false
-      });
+    // Game over (enemy reaches player) - only if not invulnerable
+    if (!this.player.isInvulnerable) {
+      const enemyCollision = CollisionManager.checkPlayerEnemyCollision(
+        this.player, 
+        this.enemies.enemies
+      );
       
-      // Create explosion at player position
-      this.effects.createExplosion(this.player.position);
-      
-      // Remove player ship (cockpit is automatically removed as it's a child)
-      this.player.destroy();
-      
-      // Play explosion sound
-      this.audio.playExplosion();
+      if (enemyCollision && !gameState.playerDestroyed) {
+        // Mark player as destroyed
+        this.engine.setGameState({
+          playerDestroyed: true,
+          isPlaying: false
+        });
+        
+        // Create explosion at player position
+        this.effects.createExplosion(this.player.position);
+        
+        // Remove player ship (cockpit and wings are automatically removed as they're children)
+        this.player.destroy();
+        
+        // Play explosion sound
+        this.audio.playExplosion();
+      }
     }
     
     // Handle explosion completion

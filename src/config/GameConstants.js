@@ -14,8 +14,8 @@ export const GAME_CONFIG = {
   ENEMY_Y_SPACING: 1.0,
   
   // Power-up settings
-  POWERUP_SPAWN_INTERVAL: 900, // frames between power-up spawns (15 seconds at 60fps)
-  POWERUP_RED_CHANCE: 0.1, // 10% chance for red power-up
+  POWERUP_SPAWN_INTERVAL: 300, // frames between power-up spawns (5 seconds at 60fps)
+  POWERUP_RED_CHANCE: 0.3, // 30% chance for red power-up (increased for testing)
   
   // Game timing
   GAME_START_DELAY: 180, // 3 seconds at 60fps before enemies start swooping

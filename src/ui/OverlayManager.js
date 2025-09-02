@@ -58,6 +58,34 @@ export class OverlayManager {
     this.overlay.style.opacity = '1';
   }
 
+  updateInvulnerabilityStatus(isInvulnerable) {
+    let statusElement = document.getElementById('invulnerability-status');
+    if (!statusElement) {
+      statusElement = document.createElement('div');
+      statusElement.id = 'invulnerability-status';
+      statusElement.style.position = 'fixed';
+      statusElement.style.top = '10px';
+      statusElement.style.right = '10px';
+      statusElement.style.color = '#fff';
+      statusElement.style.fontSize = '1.2rem';
+      statusElement.style.fontFamily = 'Arial, sans-serif';
+      statusElement.style.background = 'rgba(0,0,0,0.7)';
+      statusElement.style.padding = '10px';
+      statusElement.style.borderRadius = '5px';
+      statusElement.style.zIndex = '999';
+      document.body.appendChild(statusElement);
+    }
+    
+    if (isInvulnerable) {
+      statusElement.textContent = 'INVULNERABLE';
+      statusElement.style.color = '#ffaa00';
+      statusElement.style.background = 'rgba(255,170,0,0.3)';
+    } else {
+      statusElement.textContent = '';
+      statusElement.style.background = 'transparent';
+    }
+  }
+
   hideOverlay() {
     this.overlay.style.display = 'none';
   }

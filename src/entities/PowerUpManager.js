@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
 export class PowerUpManager {
-  constructor(scene) {
+  constructor(scene, enemyManager = null) {
     this.scene = scene;
+    this.enemyManager = enemyManager;
     this.powerUps = [];
     this.spawnTimer = 0;
+    this.zPlaneEnemyTimer = 0;
     this.powerUpGeometry = new THREE.SphereGeometry(0.15, 16, 12);
   }
 
@@ -72,17 +74,50 @@ export class PowerUpManager {
     this.scene.add(powerUp);
     this.powerUps.push(powerUp);
     console.log('Total power-ups:', this.powerUps.length);
+    
+    // Spawn enemy on Z plane when red power-up is created
+    if (type === 'red' && this.enemyManager) {
+      this.spawnEnemyOnZPlane();
+    }
+    
     return powerUp;
   }
 
-  update(gameState) {
+  update(gameState, player) {
+    // Z plane enemy spawning (periodic, like Space Invaders)
+    if (gameState.isPlaying) {
+      this.zPlaneEnemyTimer++;
+      if (this.zPlaneEnemyTimer >= 1200) { // Spawn every 20 seconds (60fps * 20)
+        this.spawnEnemyOnZPlane();
+        this.zPlaneEnemyTimer = 0;
+      }
+    }
+
     // Power-up spawning
     if (gameState.isPlaying) {
       this.spawnTimer++;
       if (this.spawnTimer >= GAME_CONFIG.POWERUP_SPAWN_INTERVAL) {
         console.log('Spawning power-up!');
-        // 10% chance for red power-up, 90% for blue
-        const powerUpType = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE ? 'red' : 'blue';
+        
+        // Determine power-up type based on player's wing status
+        let powerUpType;
+        const hasBoth = player.hasBothWings();
+        const hasAny = player.hasAnyWing();
+        const missingWing = player.getMissingWing();
+        
+        console.log('Wing status:', { hasBoth, hasAny, missingWing, leftWing: !!player.leftWing, rightWing: !!player.rightWing });
+        
+        if (hasBoth) {
+          // Player has both wings, only spawn blue power-ups
+          powerUpType = 'blue';
+          console.log('Player has both wings, spawning blue power-up');
+        } else {
+          // Player missing wings, can spawn red power-ups (adds both wings)
+          const shouldSpawnRed = Math.random() < GAME_CONFIG.POWERUP_RED_CHANCE;
+          powerUpType = shouldSpawnRed ? 'red' : 'blue';
+          console.log(`Player missing wings, spawning ${powerUpType} power-up (red adds both wings, chance: ${GAME_CONFIG.POWERUP_RED_CHANCE})`);
+        }
+        
         this.createPowerUp(powerUpType);
         this.spawnTimer = 0;
       }
@@ -152,8 +187,21 @@ export class PowerUpManager {
       // Handle different power-up types
       const powerUpType = powerUp.userData.type;
       if (powerUpType === 'red') {
-        console.log('Red power-up collected! (Special effect)');
-        return { type: 'red' };
+        console.log('Red power-up collected! (Wing upgrade)');
+        
+        // Add both wings if player doesn't have them
+        if (!player.hasBothWings()) {
+          if (!player.leftWing || player.leftWing.userData.isDestroyed) {
+            player.addWing('left');
+          }
+          if (!player.rightWing || player.rightWing.userData.isDestroyed) {
+            player.addWing('right');
+          }
+          return { type: 'red', wingsAdded: true };
+        } else {
+          console.log('Player already has both wings!');
+          return { type: 'red', wingsAdded: false };
+        }
       } else {
         console.log('Blue power-up collected! (Standard effect)');
         return { type: 'blue' };
@@ -170,6 +218,34 @@ export class PowerUpManager {
       }
     }
     return null;
+  }
+
+  spawnEnemyOnZPlane() {
+    if (!this.enemyManager) return;
+    
+    // Create enemy in the distance behind everything else
+    const enemyGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.3);
+    const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+    
+    // Position enemy in the distance behind everything else, at wing bullet height
+    enemy.position.set(
+      (Math.random() - 0.5) * 10, // Random X position (-5 to 5)
+      -6.9, // Same height as wing bullets (player Y -6.5 + wing Y -0.4)
+      -25  // Behind everything else (negative Z = further away)
+    );
+    
+    // Set up enemy data for Z plane movement (toward camera)
+    enemy.userData = {
+      state: 'zPlane',
+      moveSpeed: 0.01 + Math.random() * 0.01, // Much slower movement (0.01-0.02)
+      originalZ: enemy.position.z,
+    };
+    
+    this.scene.add(enemy);
+    this.enemyManager.enemies.push(enemy);
+    
+    console.log('Enemy spawned on Z plane at position:', enemy.position);
   }
 
   clearAll() {
