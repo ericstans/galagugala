@@ -36,10 +36,11 @@ class Game {
     this.respawnDelay = 0; // Delay before respawning (in seconds)
     this.enemyPauseDelay = 0; // Delay before enemies start moving again (in seconds)
     this.enemyDiveDelay = 0; // Delay before enemies start diving after respawn (in seconds)
+    this.portalStarted = false; // Flag to track if portal animation has started
     
     this.enemies = null; // Will be created after engine initialization
     this.powerUps = new PowerUpManager(this.engine.scene);
-    this.effects = new EffectsManager(this.engine.scene);
+    this.effects = new EffectsManager(this.engine.scene, this.audio);
     
     this.audioStarted = false;
     this.gameStarted = false;
@@ -231,8 +232,17 @@ class Game {
     
     if (this.respawnDelay > 0) {
       this.respawnDelay -= 1/60; // Assuming 60 FPS
+      
+      // Start portal animation 2 seconds before respawn
+      if (this.respawnDelay <= 2.0 && !this.portalStarted) {
+        const spawnPosition = new THREE.Vector3(0, -7.0, 0); // Just below the ship
+        this.effects.startPortalAnimation(spawnPosition);
+        this.portalStarted = true;
+      }
+      
       if (this.respawnDelay <= 0) {
         this.respawnPlayer();
+        this.portalStarted = false; // Reset portal flag
         // Set 2-second delay before enemies can start diving again
         this.enemyDiveDelay = 2.0;
       }
@@ -759,6 +769,7 @@ class Game {
     this.respawnDelay = 0; // Reset respawn delay
     this.enemyPauseDelay = 0; // Reset enemy pause delay
     this.enemyDiveDelay = 0; // Reset enemy dive delay
+    this.portalStarted = false; // Reset portal flag
     this.overlay.resetScore();
     this.overlay.showScore(); // Show score for restart
     this.overlay.showLives(); // Show lives display for restart

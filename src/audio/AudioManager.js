@@ -955,4 +955,97 @@ export class AudioManager {
     if (!this.audioContext) return;
     this.createRobotSpeech(text);
   }
+
+  createPortalSound() {
+    if (!this.audioContext) return null;
+    
+    const voices = [];
+    const baseFreq = 120; // Base frequency for all voices (5th higher: 80 * 1.5)
+    
+    // Create three voices, each with two slightly detuned sine waves
+    for (let i = 0; i < 3; i++) {
+      const voice = {
+        oscillator1: this.audioContext.createOscillator(),
+        oscillator2: this.audioContext.createOscillator(),
+        gainNode: this.audioContext.createGain(),
+        lfo: this.audioContext.createOscillator(), // For wub effect
+        lfoGain: this.audioContext.createGain(),
+        detuneAmount: (Math.random() - 0.5) * 20, // Random detune ±10 cents
+        wubSpeed: 0.5 + Math.random() * 2, // Random wub speed 0.5-2.5 Hz
+        startTime: this.audioContext.currentTime
+      };
+      
+      // Set up oscillators with slight detuning
+      voice.oscillator1.frequency.setValueAtTime(baseFreq + (i * 20), this.audioContext.currentTime);
+      voice.oscillator2.frequency.setValueAtTime(baseFreq + (i * 20) + voice.detuneAmount, this.audioContext.currentTime);
+      voice.oscillator1.type = 'sine';
+      voice.oscillator2.type = 'sine';
+      
+      // Set up LFO for wub effect
+      voice.lfo.frequency.setValueAtTime(voice.wubSpeed, this.audioContext.currentTime);
+      voice.lfo.type = 'sine';
+      
+      // Connect the audio graph
+      voice.oscillator1.connect(voice.gainNode);
+      voice.oscillator2.connect(voice.gainNode);
+      voice.lfo.connect(voice.lfoGain);
+      voice.lfoGain.connect(voice.oscillator1.frequency);
+      voice.lfoGain.connect(voice.oscillator2.frequency);
+      voice.gainNode.connect(this.audioContext.destination);
+      
+      // Set initial volume (will be modulated by portal size)
+      voice.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      
+      // Start oscillators
+      voice.oscillator1.start(this.audioContext.currentTime);
+      voice.oscillator2.start(this.audioContext.currentTime);
+      voice.lfo.start(this.audioContext.currentTime);
+      
+      voices.push(voice);
+    }
+    
+    return voices;
+  }
+  
+  updatePortalSound(voices, portalProgress, portalSize) {
+    if (!voices || !this.audioContext) return;
+    
+    const currentTime = this.audioContext.currentTime;
+    const baseVolume = this.masterVolume * 0.3; // Base volume for portal sound
+    
+    voices.forEach((voice, index) => {
+      // Calculate volume based on portal size and progress
+      // Volume peaks when portal is at maximum size
+      const sizeMultiplier = Math.sin(portalProgress * Math.PI); // 0 to 1 to 0
+      const volume = baseVolume * sizeMultiplier * (0.5 + index * 0.2); // Different volumes per voice
+      
+      // Set volume
+      voice.gainNode.gain.setValueAtTime(volume, currentTime);
+      
+      // Decay wub speed over time
+      const timeElapsed = currentTime - voice.startTime;
+      const decayedWubSpeed = voice.wubSpeed * Math.exp(-timeElapsed * 0.5); // Exponential decay
+      voice.lfo.frequency.setValueAtTime(decayedWubSpeed, currentTime);
+      
+      // Modulate LFO gain for wub intensity (also decays over time)
+      const wubIntensity = 10 * Math.exp(-timeElapsed * 0.3); // Wub intensity decays
+      voice.lfoGain.gain.setValueAtTime(wubIntensity, currentTime);
+    });
+  }
+  
+  stopPortalSound(voices) {
+    if (!voices) return;
+    
+    const currentTime = this.audioContext.currentTime;
+    
+    voices.forEach(voice => {
+      // Fade out over 0.5 seconds
+      voice.gainNode.gain.linearRampToValueAtTime(0, currentTime + 0.5);
+      
+      // Stop oscillators after fade out
+      voice.oscillator1.stop(currentTime + 0.5);
+      voice.oscillator2.stop(currentTime + 0.5);
+      voice.lfo.stop(currentTime + 0.5);
+    });
+  }
 }

@@ -4,8 +4,9 @@ import { GAME_CONFIG } from '../config/GameConstants.js';
 const DEBUG = false;
 
 export class EffectsManager {
-  constructor(scene) {
+  constructor(scene, audioManager = null) {
     this.scene = scene;
+    this.audioManager = audioManager;
     this.explosions = [];
     this.explosionGeometry = new THREE.SphereGeometry(0.1, 8, 6);
     this.explosionMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600 });
@@ -44,6 +45,18 @@ export class EffectsManager {
     
     // Intro text
     this.introText = null;
+    
+    // Portal animation for respawn
+    this.portalAnimation = null;
+    this.portalRings = [];
+    this.portalGeometry = new THREE.RingGeometry(0, 0.1, 32);
+    this.portalMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00ffff, 
+      transparent: true, 
+      opacity: 0.8,
+      side: THREE.DoubleSide
+    });
+    this.portalSoundVoices = null;
   }
 
   createExplosion(position) {
@@ -93,6 +106,9 @@ export class EffectsManager {
     if (levelCompleteResult && levelCompleteResult.completed) {
       return { levelCompleteFinished: true };
     }
+    
+    // Update portal animation
+    this.updatePortalAnimation();
     if (levelCompleteResult && levelCompleteResult.color) {
       return { levelCompleteColor: levelCompleteResult.color };
     }
@@ -568,5 +584,111 @@ export class EffectsManager {
     this.levelCompleteAnimation = null;
     this.colorCycleTimer = 0;
     this.scene.background = null;
+    
+    // Clear portal animation
+    this.clearPortalAnimation();
+  }
+  
+  startPortalAnimation(position) {
+    if (DEBUG) console.log('Starting portal animation at position:', position);
+    
+    this.portalAnimation = {
+      active: true,
+      duration: 240, // 4 seconds at 60fps (starts 2 seconds earlier)
+      timer: 0,
+      position: position.clone()
+    };
+    
+    // Start portal sound effect
+    if (this.audioManager) {
+      this.portalSoundVoices = this.audioManager.createPortalSound();
+    }
+    
+    // Create 3 concentric portal rings
+    this.portalRings = [];
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(this.portalGeometry, this.portalMaterial.clone());
+      ring.position.copy(position);
+      ring.position.z = -0.1; // Behind the ship
+      ring.rotation.x = Math.PI / 2; // Face the camera
+      ring.userData = {
+        index: i,
+        maxRadius: 4.0 + (i * 1.6), // Twice as large: 4.0, 5.6, 7.2
+        startDelay: i * 10 // Staggered start times
+      };
+      this.scene.add(ring);
+      this.portalRings.push(ring);
+    }
+  }
+  
+  updatePortalAnimation() {
+    if (!this.portalAnimation || !this.portalAnimation.active) {
+      return false;
+    }
+    
+    this.portalAnimation.timer++;
+    const progress = this.portalAnimation.timer / this.portalAnimation.duration;
+    
+    // Update each ring
+    let maxPortalSize = 0;
+    this.portalRings.forEach(ring => {
+      const ringData = ring.userData;
+      const ringProgress = Math.max(0, (this.portalAnimation.timer - ringData.startDelay) / (this.portalAnimation.duration - ringData.startDelay));
+      
+      if (ringProgress > 0) {
+        // Expand then contract
+        let scale;
+        if (ringProgress < 0.5) {
+          // Expanding phase
+          scale = (ringProgress * 2) * ringData.maxRadius;
+        } else {
+          // Contracting phase
+          scale = ((1 - ringProgress) * 2) * ringData.maxRadius;
+        }
+        
+        ring.scale.set(scale, scale, 1);
+        
+        // Track maximum portal size for sound modulation
+        maxPortalSize = Math.max(maxPortalSize, scale);
+        
+        // Fade in and out
+        const opacity = Math.sin(ringProgress * Math.PI) * 0.8;
+        ring.material.opacity = opacity;
+        
+        // Rotate the rings
+        ring.rotation.z += 0.1;
+      }
+    });
+    
+    // Update portal sound based on animation progress and size
+    if (this.audioManager && this.portalSoundVoices) {
+      this.audioManager.updatePortalSound(this.portalSoundVoices, progress, maxPortalSize);
+    }
+    
+    // Check if animation is complete
+    if (this.portalAnimation.timer >= this.portalAnimation.duration) {
+      this.clearPortalAnimation();
+      return true; // Animation finished
+    }
+    
+    return false;
+  }
+  
+  clearPortalAnimation() {
+    if (this.portalRings.length > 0) {
+      this.portalRings.forEach(ring => {
+        this.scene.remove(ring);
+        ring.material.dispose();
+      });
+      this.portalRings = [];
+    }
+    
+    // Stop portal sound effect
+    if (this.audioManager && this.portalSoundVoices) {
+      this.audioManager.stopPortalSound(this.portalSoundVoices);
+      this.portalSoundVoices = null;
+    }
+    
+    this.portalAnimation = null;
   }
 }
