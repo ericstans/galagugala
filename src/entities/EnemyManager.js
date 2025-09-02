@@ -8,7 +8,11 @@ export class EnemyManager {
     this.diveCooldown = 0;
     this.gameStartTimer = 0;
     this.enemyGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.3);
-    this.enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+    this.enemyMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xff3333,
+      transparent: false,
+      opacity: 1.0
+    });
     this.initialColumnStructure = {}; // Track initial column structure
     this.processedColumns = new Set(); // Track which columns have already spawned power-ups
     this.lastEnemyInColumn = {}; // Track the last enemy destroyed in each column
@@ -73,6 +77,16 @@ export class EnemyManager {
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
         const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
+        
+        // Add darker red edges
+        const edgeGeometry = new THREE.EdgesGeometry(scaledGeometry);
+        const edgeMaterial = new THREE.LineBasicMaterial({ 
+          color: 0xcc1111, // Darker red
+          linewidth: 2
+        });
+        const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+        enemy.add(edges);
+        
         const formationX = (col - totalCols / 2 + 0.5) * clampedXSpacing;
         const formationY = row * clampedYSpacing + bottomMargin;
         enemy.position.set(formationX, formationY, 0);

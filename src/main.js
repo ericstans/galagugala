@@ -382,6 +382,8 @@ class Game {
       console.log('Player destroyed! Starting Game Over animation...');
       this.audio.playGameOver();
       this.effects.startGameOverAnimation();
+      // Hide chain display on game over
+      this.overlay.hideChainOnGameOver();
       return;
     }
     
@@ -390,6 +392,8 @@ class Game {
       console.log('Player destroyed! Starting Game Over animation immediately...');
       this.audio.playGameOver();
       this.effects.startGameOverAnimation();
+      // Hide chain display on game over
+      this.overlay.hideChainOnGameOver();
       this.engine.setGameState({ explosionComplete: true });
       return;
     }
@@ -480,6 +484,9 @@ class Game {
     
     // Silently hide chain display for restart (no "CHAIN BROKEN" text)
     this.overlay.silentHideChain();
+    
+    // Reset game over state
+    this.overlay.resetGameOverState();
     
     // Clear all score popups
     this.overlay.clearAllScorePopups();

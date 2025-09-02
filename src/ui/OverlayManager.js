@@ -9,6 +9,7 @@ export class OverlayManager {
     this.lastChainCount = 0; // Track previous chain count to detect breaks
     this.chainBrokenAnimating = false; // Track if "CHAIN BROKEN" is currently animating
     this.scorePopups = []; // Track active score popups
+    this.gameOverActive = false; // Track if game over is active
     this.setupEventListeners();
   }
 
@@ -292,6 +293,11 @@ export class OverlayManager {
   }
 
   updateChain(chainCount) {
+    // Don't update chain display if game over is active
+    if (this.gameOverActive) {
+      return;
+    }
+    
     if (chainCount > 2) {
       // Only show new chain if "CHAIN BROKEN" animation is not in progress
       if (!this.chainBrokenAnimating) {
@@ -330,6 +336,30 @@ export class OverlayManager {
     // Reset animation flag and last chain count
     this.chainBrokenAnimating = false;
     this.lastChainCount = 0;
+  }
+
+  // Hide chain display on game over (immediate hide without animation)
+  hideChainOnGameOver() {
+    // Set game over flag to prevent chain updates
+    this.gameOverActive = true;
+    
+    // Cancel any existing fade-out timeout
+    if (this.chainFadeTimeout) {
+      clearTimeout(this.chainFadeTimeout);
+      this.chainFadeTimeout = null;
+    }
+    
+    // Hide the display immediately
+    this.chainDisplay.style.display = 'none';
+    this.chainDisplay.style.opacity = '0';
+    
+    // Reset the animation flag
+    this.chainBrokenAnimating = false;
+  }
+
+  // Reset game over state (called on game restart)
+  resetGameOverState() {
+    this.gameOverActive = false;
   }
 
   // Score display methods
