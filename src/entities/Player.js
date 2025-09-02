@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
+const DEBUG = false;
+
 export class Player {
   constructor(scene) {
     this.scene = scene;
@@ -36,7 +38,7 @@ export class Player {
     this.invulnerabilityFlashTimer = 0;
     this.originalMaterials = new Map(); // Store original materials for restoration
     
-    console.log('Player created - no wings initially');
+    if (DEBUG) console.log('Player created - no wings initially');
   }
 
   hide() {

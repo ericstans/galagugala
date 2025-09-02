@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
-const debug = false;
+const DEBUG = false;
 
 export class PowerUpManager {
   constructor(scene) {
@@ -158,7 +158,7 @@ export class PowerUpManager {
       // Handle different power-up types
       const powerUpType = powerUp.userData.type;
       if (powerUpType === 'red') {
-        if (debug) console.log('Red power-up collected! (Both wings upgrade)');
+        if (DEBUG) console.log('Red power-up collected! (Both wings upgrade)');
         
         // Play power-up collection sound (red power-ups use base pitch)
         audioManager.playPowerUp(1);
@@ -178,14 +178,14 @@ export class PowerUpManager {
         }
         
         if (wingsAdded.length > 0) {
-          if (debug) console.log(`Wings added: ${wingsAdded.join(', ')}`);
+          if (DEBUG) console.log(`Wings added: ${wingsAdded.join(', ')}`);
           return { type: 'red', wingsAdded: wingsAdded };
         } else {
-          if (debug) console.log('Player already has both wings!');
+          if (DEBUG) console.log('Player already has both wings!');
           return { type: 'red', wingsAdded: [] };
         }
       } else {
-        if (debug) console.log('Blue power-up collected! (Standard effect)');
+        if (DEBUG) console.log('Blue power-up collected! (Standard effect)');
         this.incrementChain(audioManager);
         
         // Play power-up collection sound with current chain count (higher pitch for longer chains)

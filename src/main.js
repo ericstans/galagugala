@@ -8,6 +8,8 @@ import { EffectsManager } from './effects/EffectsManager.js';
 import { InputManager } from './input/InputManager.js';
 import { OverlayManager } from './ui/OverlayManager.js';
 import { CollisionManager } from './physics/CollisionManager.js';
+
+const DEBUG = false;
  
 class Game {
   constructor() {
@@ -23,7 +25,7 @@ class Game {
     
     // Level progression - check URL parameter
     this.currentLevel = this.getLevelFromURL();
-    console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
+    if (DEBUG) console.log(`Game constructor: currentLevel set to ${this.currentLevel}`);
     
     // Score tracking
     this.score = 0;
@@ -47,21 +49,21 @@ class Game {
     const urlParams = new URLSearchParams(window.location.search);
     const levelParam = urlParams.get('level');
     
-    console.log(`URL search params: ${window.location.search}`);
-    console.log(`Level parameter from URL: ${levelParam}`);
+    if (DEBUG) console.log(`URL search params: ${window.location.search}`);
+    if (DEBUG) console.log(`Level parameter from URL: ${levelParam}`);
     
     if (levelParam) {
       const level = parseInt(levelParam, 10);
-      console.log(`Parsed level: ${level}`);
+      if (DEBUG) console.log(`Parsed level: ${level}`);
       if (level >= 1 && level <= 100) { // Reasonable level range
-        console.log(`Starting game at level ${level} (from URL parameter)`);
+        if (DEBUG) console.log(`Starting game at level ${level} (from URL parameter)`);
         return level;
       } else {
         console.warn(`Invalid level parameter: ${levelParam}. Must be between 1-100. Starting at level 1.`);
       }
     }
     
-    console.log(`No valid level parameter found, defaulting to level 1`);
+    if (DEBUG) console.log(`No valid level parameter found, defaulting to level 1`);
     return 1; // Default to level 1
   }
 
@@ -84,7 +86,7 @@ class Game {
     
     // Create enemies after engine is initialized so bounds calculation works
     this.enemies = new EnemyManager(this.engine.scene, this.currentLevel, this.engine);
-    console.log(`EnemyManager created with level ${this.currentLevel}`);
+    if (DEBUG) console.log(`EnemyManager created with level ${this.currentLevel}`);
     
     this.setupAudioStart();
     this.setupGameStart();
@@ -179,7 +181,7 @@ class Game {
         this.overlay.updateLevel(this.currentLevel);
         
         this.gameStarted = true;
-        console.log('Game started!');
+        if (DEBUG) console.log('Game started!');
       }
     };
 
@@ -322,7 +324,7 @@ class Game {
       if (powerUpResult) {
         // Handle wing upgrades
         if (powerUpResult.type === 'red' && powerUpResult.wingsAdded && powerUpResult.wingsAdded.length > 0) {
-          console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
+          if (DEBUG) console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
         }
         
         // Handle chain updates and score bonus for blue power-ups
@@ -332,7 +334,7 @@ class Game {
           // Add score bonus: 10^CHAIN
           if (powerUpResult.scoreBonus !== undefined) {
             this.addScore(powerUpResult.scoreBonus);
-            console.log(`Blue power-up score bonus: ${powerUpResult.scoreBonus} points (10^${powerUpResult.chainCount})`);
+            if (DEBUG) console.log(`Blue power-up score bonus: ${powerUpResult.scoreBonus} points (10^${powerUpResult.chainCount})`);
             
             // Show score popup at power-up position
             if (powerUpResult.position) {
@@ -385,7 +387,7 @@ class Game {
         // Play explosion sound
         this.audio.playExplosion();
         
-        console.log(`${side} wing destroyed!`);
+        if (DEBUG) console.log(`${side} wing destroyed!`);
       }
     }
     
@@ -417,7 +419,7 @@ class Game {
     // Handle explosion completion
     if (completedExplosion && gameState.playerDestroyed && !gameState.explosionComplete) {
       this.engine.setGameState({ explosionComplete: true });
-      console.log('Player destroyed! Starting Game Over animation...');
+      if (DEBUG) console.log('Player destroyed! Starting Game Over animation...');
       this.audio.playGameOver();
       this.audio.createRobotSpeech("GAME OVER");
       this.effects.startGameOverAnimation();
@@ -428,7 +430,7 @@ class Game {
     
     // Fallback: Start Game Over animation immediately if player is destroyed
     if (gameState.playerDestroyed && !this.effects.gameOverAnimation) {
-      console.log('Player destroyed! Starting Game Over animation immediately...');
+      if (DEBUG) console.log('Player destroyed! Starting Game Over animation immediately...');
       this.audio.playGameOver();
       this.audio.createRobotSpeech("GAME OVER");
       this.effects.startGameOverAnimation();
@@ -440,14 +442,14 @@ class Game {
     
     // Handle restart when game over and SPACE is pressed
     if (this.effects.isWaitingForRestart() && this.input.isShootPressed()) {
-      console.log('Restarting game...');
+      if (DEBUG) console.log('Restarting game...');
       this.restartGame();
       return;
     }
 
     // Level complete condition (only if game is still playing)
     if (this.enemies && this.enemies.enemies.length === 0 && gameState.isPlaying && !this.effects.levelCompleteAnimation) {
-      console.log('All enemies destroyed! Starting level complete animation...');
+      if (DEBUG) console.log('All enemies destroyed! Starting level complete animation...');
       this.effects.startLevelCompleteAnimation();
       this.overlay.showLevelComplete();
     return;
@@ -455,7 +457,7 @@ class Game {
 
     // Handle level complete animation finished
     if (levelCompleteFinished) {
-      console.log('Level complete animation finished! Starting next level...');
+      if (DEBUG) console.log('Level complete animation finished! Starting next level...');
       this.overlay.hideLevelComplete();
       this.startNextLevel();
       return;
@@ -464,7 +466,7 @@ class Game {
 
   startNextLevel() {
     this.currentLevel++;
-    console.log(`Starting level ${this.currentLevel}...`);
+    if (DEBUG) console.log(`Starting level ${this.currentLevel}...`);
     
     // Check if this is a plasma storm level (every 10 levels)
     if (this.currentLevel % 10 === 0) {
@@ -498,17 +500,17 @@ class Game {
     this.overlay.updateChain(currentChainCount);
     
     // Spawn new enemies for the next level with level-based scaling
-    console.log(`Creating enemies for level ${this.currentLevel}...`);
+    if (DEBUG) console.log(`Creating enemies for level ${this.currentLevel}...`);
     this.enemies.createEnemies(this.currentLevel, this.engine);
     
     // Update soundtrack for new level
     this.audio.updateSoundtrack(this.currentLevel);
     
-    console.log(`Level ${this.currentLevel} started!`);
+    if (DEBUG) console.log(`Level ${this.currentLevel} started!`);
   }
 
   startPlasmaStorm() {
-    console.log(`Plasma Storm event triggered for level ${this.currentLevel}!`);
+    if (DEBUG) console.log(`Plasma Storm event triggered for level ${this.currentLevel}!`);
     
     // Update level display immediately for plasma storm level
     this.overlay.updateLevel(this.currentLevel);
@@ -525,7 +527,7 @@ class Game {
   }
 
   floodPowerUps() {
-    console.log("Starting power-up flood!");
+    if (DEBUG) console.log("Starting power-up flood!");
     
     // Spawn power-ups 30 times per second for 5 seconds (150 total spawns)
     const spawnInterval = 1000 / 30; // ~33ms between spawns
@@ -557,11 +559,11 @@ class Game {
   }
 
   restartGame() {
-    console.log('Restarting game...');
+    if (DEBUG) console.log('Restarting game...');
     
     // Reset level to URL parameter level (or 1 if no parameter)
     this.currentLevel = this.getLevelFromURL();
-    console.log(`Restarting at level ${this.currentLevel} (from URL parameter)`);
+    if (DEBUG) console.log(`Restarting at level ${this.currentLevel} (from URL parameter)`);
     
     // Update level display
     this.overlay.updateLevel(this.currentLevel);
@@ -602,7 +604,7 @@ class Game {
     // Start soundtrack for the restart level
     this.audio.updateSoundtrack(this.currentLevel);
     
-    console.log(`Game restarted at level ${this.currentLevel}!`);
+    if (DEBUG) console.log(`Game restarted at level ${this.currentLevel}!`);
   }
 }
 

@@ -1,5 +1,7 @@
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
+const DEBUG = false;
+
 export class AudioManager {
   constructor() {
     this.audioContext = null;
@@ -779,9 +781,9 @@ export class AudioManager {
       const randomIndex = Math.floor(Math.random() * voices.length);
       this.selectedVoice = voices[randomIndex];
       this.voiceSelected = true;
-      console.log(`Selected random voice: ${this.selectedVoice.name} (${this.selectedVoice.lang})`);
+      if (DEBUG) console.log(`Selected random voice: ${this.selectedVoice.name} (${this.selectedVoice.lang})`);
     } else {
-      console.log('No voices available yet, will select when voices load');
+      if (DEBUG) console.log('No voices available yet, will select when voices load');
     }
   }
 
@@ -812,18 +814,18 @@ export class AudioManager {
       // Use the selected random voice
       if (this.selectedVoice) {
         utterance.voice = this.selectedVoice;
-        console.log(`Using selected voice: ${this.selectedVoice.name}`);
+        if (DEBUG) console.log(`Using selected voice: ${this.selectedVoice.name}`);
       } else {
-        console.log('No voice selected, using default voice with robot parameters');
+        if (DEBUG) console.log('No voice selected, using default voice with robot parameters');
       }
       
       // Add event listeners
       utterance.onstart = () => {
-        console.log('Robot speech started');
+        if (DEBUG) console.log('Robot speech started');
       };
       
       utterance.onend = () => {
-        console.log('Robot speech ended');
+        if (DEBUG) console.log('Robot speech ended');
       };
       
       speechSynthesis.speak(utterance);

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
+const DEBUG = false;
+
 export class EnemyManager {
   constructor(scene, level = 1, gameEngine = null) {
     this.scene = scene;
@@ -33,7 +35,7 @@ export class EnemyManager {
     const totalRows = Math.min(baseRows + additionalRows, 8); // Cap at 8 rows
     const totalCols = Math.min(baseCols + additionalCols, 12); // Cap at 12 columns
     
-    console.log(`Level ${level} calculation: baseRows=${baseRows}, baseCols=${baseCols}, additionalRows=${additionalRows}, additionalCols=${additionalCols}, totalRows=${totalRows}, totalCols=${totalCols}`);
+    if (DEBUG) console.log(`Level ${level} calculation: baseRows=${baseRows}, baseCols=${baseCols}, additionalRows=${additionalRows}, additionalCols=${additionalCols}, totalRows=${totalRows}, totalCols=${totalCols}`);
     
     // Get dynamic bounds from game engine if available
     let bounds;
@@ -70,7 +72,7 @@ export class EnemyManager {
     const actualFormationHeight = (totalRows - 1) * clampedYSpacing;
     const formationArea = actualFormationWidth * actualFormationHeight;
     
-    console.log(`X spacing: dynamic=${dynamicXSpacing.toFixed(2)}, clamped=${clampedXSpacing.toFixed(2)}, formation width=${actualFormationWidth.toFixed(2)}`);
+    if (DEBUG) console.log(`X spacing: dynamic=${dynamicXSpacing.toFixed(2)}, clamped=${clampedXSpacing.toFixed(2)}, formation width=${actualFormationWidth.toFixed(2)}`);
     
     // Scale enemy size inversely with formation area (larger formations = smaller enemies)
     const baseEnemySize = 0.7;
@@ -80,7 +82,7 @@ export class EnemyManager {
     // Create new geometry with scaled size
     const scaledGeometry = new THREE.BoxGeometry(enemySize, enemySize, enemySize * 0.4);
     
-    console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}, Y spacing ${clampedYSpacing.toFixed(2)}`);
+    if (DEBUG) console.log(`Level ${level}: Creating ${totalRows}x${totalCols} enemy formation with size scale ${sizeScale.toFixed(2)}, Y spacing ${clampedYSpacing.toFixed(2)}`);
     
     // Reset initial column structure and processed columns
     this.initialColumnStructure = {};

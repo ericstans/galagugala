@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
+const DEBUG = false;
+
 export class EffectsManager {
   constructor(scene) {
     this.scene = scene;
