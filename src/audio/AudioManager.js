@@ -29,6 +29,10 @@ export class AudioManager {
     this.centralBeatScheduler = null; // Central beat scheduler for all layers
     this.activeLayers = new Set(); // Track which layers are currently active
     
+    // Random voice selection
+    this.selectedVoice = null;
+    this.voiceSelected = false;
+    
     this.initAudio();
   }
 
@@ -38,6 +42,9 @@ export class AudioManager {
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = this.masterVolume;
+      
+      // Initialize random voice selection
+      this.initializeVoiceSelection();
       
       // Create soundtrack bus with reverb
       this.soundtrackBus = this.audioContext.createGain();
@@ -740,6 +747,44 @@ export class AudioManager {
     this.activeLayers.clear();
   }
 
+  // Initialize voice selection when audio manager starts
+  initializeVoiceSelection() {
+    if (!('speechSynthesis' in window)) {
+      console.warn('Speech synthesis not supported');
+      return;
+    }
+    
+    // Try to select voice immediately if voices are already loaded
+    if (speechSynthesis.getVoices().length > 0) {
+      this.selectRandomVoice();
+    } else {
+      // Wait for voices to load, then select
+      speechSynthesis.onvoiceschanged = () => {
+        if (!this.voiceSelected) {
+          this.selectRandomVoice();
+        }
+      };
+    }
+  }
+
+  // Select a random voice from available voices
+  selectRandomVoice() {
+    if (!('speechSynthesis' in window)) {
+      console.warn('Speech synthesis not supported');
+      return;
+    }
+    
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const randomIndex = Math.floor(Math.random() * voices.length);
+      this.selectedVoice = voices[randomIndex];
+      this.voiceSelected = true;
+      console.log(`Selected random voice: ${this.selectedVoice.name} (${this.selectedVoice.lang})`);
+    } else {
+      console.log('No voices available yet, will select when voices load');
+    }
+  }
+
   // Robot voice using Web Speech API with robot-like parameters
   createRobotSpeech(text, rate = 1.2) {
     if (!('speechSynthesis' in window)) {
@@ -759,24 +804,17 @@ export class AudioManager {
     
     // Function to set up the voice and speak
     const speakWithVoice = () => {
-      // Try to find a voice that sounds more robotic
-      const voices = speechSynthesis.getVoices();
-      const robotVoice = voices.find(voice => 
-        voice.name.includes('Robot') || 
-        voice.name.includes('Synthetic') ||
-        voice.name.includes('Neural') ||
-        voice.name.includes('Microsoft') ||
-        voice.name.includes('Google') ||
-        voice.name.includes('Alex') ||
-        voice.name.includes('Daniel') ||
-        voice.name.includes('Fiona')
-      );
+      // Select random voice if not already selected
+      if (!this.voiceSelected) {
+        this.selectRandomVoice();
+      }
       
-      if (robotVoice) {
-        utterance.voice = robotVoice;
-        console.log(`Using robot voice: ${robotVoice.name}`);
+      // Use the selected random voice
+      if (this.selectedVoice) {
+        utterance.voice = this.selectedVoice;
+        console.log(`Using selected voice: ${this.selectedVoice.name}`);
       } else {
-        console.log('No robot voice found, using default voice with robot parameters');
+        console.log('No voice selected, using default voice with robot parameters');
       }
       
       // Add event listeners
