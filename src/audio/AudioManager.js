@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
 export class AudioManager {
   constructor() {
@@ -632,6 +632,21 @@ export class AudioManager {
     return this.currentChord;
   }
 
+  getSecondaryDominant(chordName) {
+    // Secondary dominants: V7 of each chord
+    // Each dominant 7th chord resolves to its target chord
+    const secondaryDominants = {
+      'Cmin': [392.00, 466.16, 523.25, 622.25],    // G7 (G, B, D, F) - resolves to Cmin
+      'Cmin7': [392.00, 466.16, 523.25, 622.25],   // G7 (G, B, D, F) - resolves to Cmin7
+      'Dmin': [440.00, 523.25, 587.33, 698.46],    // A7 (A, C#, E, G) - resolves to Dmin
+      'EbMaj': [466.16, 554.37, 622.25, 739.99],   // Bb7 (Bb, D, F, Ab) - resolves to EbMaj
+      'Fmin7': [523.25, 622.25, 698.46, 830.61],   // C7 (C, E, G, Bb) - resolves to Fmin7
+      'Gmin7': [587.33, 698.46, 783.99, 932.33]    // D7 (D, F#, A, C) - resolves to Gmin7
+    };
+    
+    return secondaryDominants[chordName] || null;
+  }
+
   createBassline() {
     if (!this.audioContext) return null;
     
@@ -778,14 +793,14 @@ export class AudioManager {
     if (!this.audioContext) return null;
     if (!this.arpActive) return null; // Don't play if arp is no longer active
     
-    // Get current chord frequencies
+    // Get current chord frequencies (same as main chord progressions)
     const chordProgressions = {
-      'Cmin7': [130.81, 155.56, 174.61, 196.00], // C, Eb, F, G
-      'Fmin7': [174.61, 196.00, 220.00, 246.94], // F, G, A, Bb
-      'EbMaj': [155.56, 174.61, 196.00, 220.00], // Eb, F, G, A
-      'Bbmin7': [233.08, 261.63, 293.66, 329.63], // Bb, C, D, Eb
-      'Dmin': [146.83, 174.61, 196.00, 220.00], // D, F, G, A
-      'Gmin7': [196.00, 220.00, 246.94, 293.66] // G, Bb, C, D
+      'Cmin': [130.81, 155.56, 196.00],      // C3, Eb3, G3
+      'Cmin7': [130.81, 155.56, 196.00, 233.08], // C3, Eb3, G3, Bb3
+      'Dmin': [146.83, 174.61, 220.00],      // D3, F3, A3
+      'EbMaj': [155.56, 196.00, 233.08],     // Eb3, G3, Bb3
+      'Fmin7': [174.61, 207.65, 261.63, 311.13], // F3, Ab3, C4, Eb4
+      'Gmin7': [196.00, 233.08, 293.66, 349.23]  // G3, Bb3, D4, F4
     };
     
     const frequencies = chordProgressions[this.currentChord];
@@ -911,6 +926,29 @@ export class AudioManager {
   createChords() {
     if (!this.audioContext) return null;
     
+    // Check if only chords are playing (level 13-14)
+    const isChordsOnly = this.activeLayers.size === 1 && this.activeLayers.has('chords');
+    
+    // Create delay nodes early if in chords-only mode
+    if (isChordsOnly && !this.delayNode) {
+      this.delayNode = this.audioContext.createDelay(1.0); // Max 1 second delay
+      this.delayGain = this.audioContext.createGain();
+      this.feedbackGain = this.audioContext.createGain();
+      
+      // Calculate quarter note delay time at current BPM (64 BPM when chords-only)
+      const currentBpm = this.bpm / 2; // 64 BPM when chords-only
+      const quarterNoteDelay = 60 / currentBpm; // Convert BPM to quarter note duration in seconds
+      
+      // Set up delay parameters
+      this.delayNode.delayTime.setValueAtTime(quarterNoteDelay, this.audioContext.currentTime); // Quarter note delay
+      this.delayGain.gain.setValueAtTime(0.4, this.audioContext.currentTime); // 40% wet signal
+      this.feedbackGain.gain.setValueAtTime(0.2, this.audioContext.currentTime); // 20% feedback
+      
+      // Set up feedback loop
+      this.delayNode.connect(this.feedbackGain);
+      this.feedbackGain.connect(this.delayNode);
+    }
+    
     // Define chord progressions (frequencies in Hz) - C Dorian mode
     const chordProgressions = {
       'Cmin': [261.63, 311.13, 392.00],      // C4, Eb4, G4
@@ -932,6 +970,74 @@ export class AudioManager {
     
     const chord = [];
     
+    // In chords-only mode, add chance of playing secondary dominant first
+    if (isChordsOnly && Math.random() < 0.3) { // 30% chance
+      const secondaryDominantFrequencies = this.getSecondaryDominant(this.currentChord);
+      if (secondaryDominantFrequencies) {
+        if (DEBUG) console.log(`Playing secondary dominant before ${this.currentChord}`);
+        
+        // Play secondary dominant first (shorter duration)
+        secondaryDominantFrequencies.forEach(freq => {
+          const domOscillator = this.audioContext.createOscillator();
+          const domGainNode = this.audioContext.createGain();
+          const domSaturationGain = this.audioContext.createGain();
+          const domBitcrusher = this.audioContext.createWaveShaper();
+          const domLowpassFilter = this.audioContext.createBiquadFilter();
+          
+          // Create secondary dominant audio chain
+          domOscillator.connect(domSaturationGain);
+          domSaturationGain.connect(domBitcrusher);
+          domBitcrusher.connect(domLowpassFilter);
+          domLowpassFilter.connect(domGainNode);
+          
+          // Apply same effects as main chords
+          domOscillator.type = 'sine';
+          domOscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+          
+          // Saturation effect
+          domSaturationGain.gain.setValueAtTime(2, this.audioContext.currentTime);
+          
+          // Bitcrushing
+          const bitcrushCurve = new Float32Array(65536);
+          const bits = 8;
+          const steps = Math.pow(2, bits);
+          for (let i = 0; i < 65536; i++) {
+            const x = (i - 32768) / 32768;
+            bitcrushCurve[i] = Math.round(x * steps) / steps;
+          }
+          domBitcrusher.curve = bitcrushCurve;
+          
+          // Low-pass filter
+          domLowpassFilter.type = 'lowpass';
+          domLowpassFilter.frequency.setValueAtTime(800, this.audioContext.currentTime);
+          domLowpassFilter.Q.setValueAtTime(1, this.audioContext.currentTime);
+          
+          // Shorter envelope for secondary dominant
+          domGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+          domGainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.05);
+          domGainNode.gain.setValueAtTime(0.15, this.audioContext.currentTime + 0.05);
+          domGainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 1.0); // Shorter duration
+          
+          // Connect through delay if in chords-only mode
+          if (isChordsOnly) {
+            domGainNode.connect(this.delayNode);
+            this.delayNode.connect(this.delayGain);
+            this.delayGain.connect(this.soundtrackBus);
+            domGainNode.connect(this.soundtrackBus); // Dry signal
+          } else {
+            domGainNode.connect(this.soundtrackBus);
+          }
+          
+          domOscillator.start(this.audioContext.currentTime);
+          domOscillator.stop(this.audioContext.currentTime + 1.0);
+          
+          chord.push({ oscillator: domOscillator, bitcrusher: domBitcrusher });
+        });
+        
+        // Continue with main chord logic immediately
+      }
+    }
+    
     frequencies.forEach(freq => {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
@@ -945,31 +1051,13 @@ export class AudioManager {
       bitcrusher.connect(lowpassFilter);
       lowpassFilter.connect(gainNode);
       
-      // Check if only chords are playing (level 13-14)
-      const isChordsOnly = this.activeLayers.size === 1 && this.activeLayers.has('chords');
+      if (DEBUG && isChordsOnly) console.log('Chords-only mode detected, will create pad sounds');
       
       if (isChordsOnly) {
-        // Add delay effect for chords-only mode
-        const delayNode = this.audioContext.createDelay(1.0); // Max 1 second delay
-        const delayGain = this.audioContext.createGain();
-        const feedbackGain = this.audioContext.createGain();
-        
-        // Calculate quarter note delay time at current BPM (64 BPM when chords-only)
-        const currentBpm = this.bpm / 2; // 64 BPM when chords-only
-        const quarterNoteDelay = 60 / currentBpm; // Convert BPM to quarter note duration in seconds
-        
-        // Set up delay parameters
-        delayNode.delayTime.setValueAtTime(quarterNoteDelay, this.audioContext.currentTime); // Quarter note delay
-        delayGain.gain.setValueAtTime(0.4, this.audioContext.currentTime); // 40% wet signal
-        feedbackGain.gain.setValueAtTime(0.2, this.audioContext.currentTime); // 20% feedback
-        
         // Create delay chain: gainNode -> delay -> delayGain -> soundtrackBus
-        // Also create feedback loop: delay -> feedbackGain -> delay
-        gainNode.connect(delayNode);
-        delayNode.connect(delayGain);
-        delayGain.connect(this.soundtrackBus);
-        delayNode.connect(feedbackGain);
-        feedbackGain.connect(delayNode);
+        gainNode.connect(this.delayNode);
+        this.delayNode.connect(this.delayGain);
+        this.delayGain.connect(this.soundtrackBus);
         
         // Also connect dry signal
         gainNode.connect(this.soundtrackBus);
@@ -1009,6 +1097,88 @@ export class AudioManager {
       oscillator.stop(this.audioContext.currentTime + 2.05);
       
       chord.push({ oscillator, bitcrusher });
+      
+      // Add pad sound when only chords are playing (notes twice as long)
+      if (isChordsOnly) {
+        if (DEBUG) console.log(`Creating pad sound for frequency ${freq}Hz`);
+        
+        // Create the main pad sound
+        const padOscillator = this.audioContext.createOscillator();
+        const padGainNode = this.audioContext.createGain();
+        const padLowpassFilter = this.audioContext.createBiquadFilter();
+        
+        // Create pad audio chain: oscillator -> lowpass -> gain -> delay (same as chords)
+        padOscillator.connect(padLowpassFilter);
+        padLowpassFilter.connect(padGainNode);
+        padGainNode.connect(this.delayNode);
+        this.delayNode.connect(this.delayGain);
+        this.delayGain.connect(this.soundtrackBus);
+        
+        // Also connect dry signal (same as chords)
+        padGainNode.connect(this.soundtrackBus);
+        
+        // Pad sound settings
+        padOscillator.type = 'triangle';
+        padOscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+        
+        // Low-pass filter for pad warmth
+        padLowpassFilter.type = 'lowpass';
+        padLowpassFilter.frequency.setValueAtTime(800, this.audioContext.currentTime); // Higher cutoff for more presence
+        padLowpassFilter.Q.setValueAtTime(1, this.audioContext.currentTime);
+        
+        // Pad envelope (twice as long as chords with longer attack and release)
+        padGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        padGainNode.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 0.5); // Longer attack (0.5s)
+        padGainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime + 0.5);
+        padGainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 4.5); // Longer release (1s)
+        
+        padOscillator.start(this.audioContext.currentTime);
+        padOscillator.stop(this.audioContext.currentTime + 4.5);
+        
+        chord.push({ oscillator: padOscillator, bitcrusher: null }); // Add pad to chord array
+        
+        // Double the lowest two notes an octave up
+        const frequencies = chordProgressions[this.currentChord];
+        const noteIndex = frequencies.indexOf(freq);
+        if (noteIndex < 2) { // Lowest two notes (indices 0 and 1)
+          const octaveUpFreq = freq * 2; // Double frequency = octave up
+          if (DEBUG) console.log(`Creating octave-up pad sound for frequency ${octaveUpFreq}Hz`);
+          
+          const octavePadOscillator = this.audioContext.createOscillator();
+          const octavePadGainNode = this.audioContext.createGain();
+          const octavePadLowpassFilter = this.audioContext.createBiquadFilter();
+          
+          // Create octave pad audio chain: oscillator -> lowpass -> gain -> delay (same as chords)
+          octavePadOscillator.connect(octavePadLowpassFilter);
+          octavePadLowpassFilter.connect(octavePadGainNode);
+          octavePadGainNode.connect(this.delayNode);
+          this.delayNode.connect(this.delayGain);
+          this.delayGain.connect(this.soundtrackBus);
+          
+          // Also connect dry signal (same as chords)
+          octavePadGainNode.connect(this.soundtrackBus);
+          
+          // Octave pad sound settings
+          octavePadOscillator.type = 'triangle';
+          octavePadOscillator.frequency.setValueAtTime(octaveUpFreq, this.audioContext.currentTime);
+          
+          // Low-pass filter for octave pad warmth
+          octavePadLowpassFilter.type = 'lowpass';
+          octavePadLowpassFilter.frequency.setValueAtTime(1200, this.audioContext.currentTime); // Higher cutoff for octave
+          octavePadLowpassFilter.Q.setValueAtTime(1, this.audioContext.currentTime);
+          
+          // Octave pad envelope (same as main pad)
+          octavePadGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+          octavePadGainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.5); // Slightly quieter
+          octavePadGainNode.gain.setValueAtTime(0.15, this.audioContext.currentTime + 0.5);
+          octavePadGainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 4.5);
+          
+          octavePadOscillator.start(this.audioContext.currentTime);
+          octavePadOscillator.stop(this.audioContext.currentTime + 4.5);
+          
+          chord.push({ oscillator: octavePadOscillator, bitcrusher: null }); // Add octave pad to chord array
+        }
+      }
     });
     
     return chord;
@@ -1115,13 +1285,15 @@ export class AudioManager {
         setTimeout(() => this.createHats(), eighthNote);
       }
       
+      // Select new chord every 4 beats (independent of which layers are active)
+      if (this.globalBeatCounter % 4 === 1) {
+        // Select new chord on beats 1, 5, 9, etc.
+        this.selectRandomChord();
+      }
+      
       if (this.activeLayers.has('bass')) {
-        // Select new chord every 4 beats, but play every beat
+        // Play bassline every beat
         this.bassBeatCounter++;
-        if (this.bassBeatCounter % 4 === 1) {
-          // Select new chord on beats 1, 5, 9, etc.
-          this.selectRandomChord();
-        }
         this.createBassline();
       }
       
