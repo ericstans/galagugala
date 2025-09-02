@@ -9,7 +9,7 @@ export class EnemyManager {
     this.enemies = [];
     this.diveCooldown = 0;
     this.gameStartTimer = 0;
-    this.enemyGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.3);
+    this.enemyGeometry = new THREE.BoxGeometry(GAME_CONFIG.ENEMY_BASE_SIZE, GAME_CONFIG.ENEMY_BASE_SIZE, 0.3);
     this.enemyMaterial = new THREE.MeshBasicMaterial({ 
       color: 0xff3333,
       transparent: false,
@@ -37,11 +37,11 @@ export class EnemyManager {
     const baseCols = GAME_CONFIG.ENEMY_COLS;
     
     // Increase columns every 2 levels, rows every 3 levels
-    const additionalCols = Math.floor((level - 1) / 2);
-    const additionalRows = Math.floor((level - 1) / 3);
+    const additionalCols = Math.floor((level - 1) / GAME_CONFIG.ENEMY_LEVEL_COL_INCREMENT);
+    const additionalRows = Math.floor((level - 1) / GAME_CONFIG.ENEMY_LEVEL_ROW_INCREMENT);
     
-    const totalRows = Math.min(baseRows + additionalRows, 8); // Cap at 8 rows
-    const totalCols = Math.min(baseCols + additionalCols, 12); // Cap at 12 columns
+    const totalRows = Math.min(baseRows + additionalRows, GAME_CONFIG.ENEMY_MAX_ROWS);
+    const totalCols = Math.min(baseCols + additionalCols, GAME_CONFIG.ENEMY_MAX_COLS);
     
     if (DEBUG) console.log(`Level ${level} calculation: baseRows=${baseRows}, baseCols=${baseCols}, additionalRows=${additionalRows}, additionalCols=${additionalCols}, totalRows=${totalRows}, totalCols=${totalCols}`);
     
@@ -83,8 +83,8 @@ export class EnemyManager {
     if (DEBUG) console.log(`X spacing: dynamic=${dynamicXSpacing.toFixed(2)}, clamped=${clampedXSpacing.toFixed(2)}, formation width=${actualFormationWidth.toFixed(2)}`);
     
     // Scale enemy size inversely with formation area (larger formations = smaller enemies)
-    const baseEnemySize = 0.7;
-    const sizeScale = Math.max(0.4, Math.min(1.0, 1.0 - (formationArea - 20) * 0.01));
+    const baseEnemySize = GAME_CONFIG.ENEMY_BASE_SIZE;
+    const sizeScale = Math.max(GAME_CONFIG.ENEMY_MIN_SIZE, Math.min(GAME_CONFIG.ENEMY_MAX_SIZE, 1.0 - (formationArea - 20) * GAME_CONFIG.ENEMY_SIZE_SCALE_FACTOR));
     const enemySize = baseEnemySize * sizeScale;
     
     // Create new geometry with scaled size
@@ -134,7 +134,7 @@ export class EnemyManager {
           formationY,
           state: 'formation', // 'formation' | 'diving' | 'returning'
           diveTime: 0,
-          diveDuration: 120 + Math.random() * 60, // frames
+          diveDuration: GAME_CONFIG.ENEMY_DIVE_DURATION_MIN + Math.random() * (GAME_CONFIG.ENEMY_DIVE_DURATION_MAX - GAME_CONFIG.ENEMY_DIVE_DURATION_MIN), // frames
           diveAngle: 0,
           diveRadius: 0,
           diveCenter: new THREE.Vector3(),
@@ -187,10 +187,10 @@ export class EnemyManager {
     else if (!divingDisabled && this.enemies.length > 0 && this.gameStartTimer >= GAME_CONFIG.GAME_START_DELAY && gameState.isPlaying && !gameState.playerDestroyed) {
       // Calculate diving probability based on level
       let diveProbability = 0;
-      if (this.currentLevel >= 3) {
-        // Scale from 0 to 0.02 over levels 3-20
-        const progress = Math.min((this.currentLevel - 3) / (20 - 3), 1);
-        diveProbability = 0.02 * progress;
+      if (this.currentLevel >= GAME_CONFIG.ENEMY_DIVE_START_LEVEL) {
+        // Scale from 0 to base probability over start to full levels
+        const progress = Math.min((this.currentLevel - GAME_CONFIG.ENEMY_DIVE_START_LEVEL) / (GAME_CONFIG.ENEMY_DIVE_FULL_LEVEL - GAME_CONFIG.ENEMY_DIVE_START_LEVEL), 1);
+        diveProbability = GAME_CONFIG.ENEMY_DIVE_BASE_PROBABILITY * progress;
       }
       
       if (Math.random() < diveProbability) {
@@ -199,7 +199,7 @@ export class EnemyManager {
           // Check for formation swooping (enemies close to each other)
           const formationGroups = this.findFormationGroups(formationEnemies);
           
-          if (formationGroups.length > 0 && Math.random() < 0.3) {
+          if (formationGroups.length > 0 && Math.random() < GAME_CONFIG.ENEMY_FORMATION_SWOOP_CHANCE) {
             // Formation swoop - multiple enemies together
             const group = formationGroups[Math.floor(Math.random() * formationGroups.length)];
             this.initiateFormationSwoop(group, player, audioManager);
@@ -209,7 +209,7 @@ export class EnemyManager {
             this.initiateSwoop(diver, Math.random(), player, audioManager);
           }
         }
-        this.diveCooldown = 60 + Math.random() * 60;
+        this.diveCooldown = GAME_CONFIG.ENEMY_DIVE_COOLDOWN_MIN + Math.random() * (GAME_CONFIG.ENEMY_DIVE_COOLDOWN_MAX - GAME_CONFIG.ENEMY_DIVE_COOLDOWN_MIN);
       }
     }
 
@@ -221,20 +221,20 @@ export class EnemyManager {
         let shootChance;
         if (this.currentLevel >= 30) {
           // Level 30+: Both green and red bullets active
-          shootChance = 0.005; // Base chance for either bullet type
+          shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE; // Base chance for either bullet type
         } else if (this.currentLevel >= 20) {
           // Level 20-29: Only red bullets
-          shootChance = 0.005; // Red bullets are now half as frequent
+          shootChance = GAME_CONFIG.ENEMY_BULLET_RED_CHANCE; // Red bullets are now half as frequent
         } else {
           // Level 10-19: Only green bullets
-          shootChance = 0.005;
+          shootChance = GAME_CONFIG.ENEMY_BULLET_GREEN_CHANCE;
         }
         
         // Apply level-based frequency multipliers for red bullets (level 35+)
         if (this.currentLevel >= 20) {
-          if (this.currentLevel >= 35) {
-            const multiplierLevels = Math.floor((this.currentLevel - 35) / 10);
-            const frequencyMultiplier = 1.5 + (multiplierLevels * 0.5);
+          if (this.currentLevel >= GAME_CONFIG.BULLET_FREQUENCY_MULTIPLIER_START_LEVEL) {
+            const multiplierLevels = Math.floor((this.currentLevel - GAME_CONFIG.BULLET_FREQUENCY_MULTIPLIER_START_LEVEL) / GAME_CONFIG.BULLET_FREQUENCY_MULTIPLIER_INCREMENT_LEVEL);
+            const frequencyMultiplier = GAME_CONFIG.BULLET_FREQUENCY_MULTIPLIER_BASE + (multiplierLevels * GAME_CONFIG.BULLET_FREQUENCY_MULTIPLIER_INCREMENT);
             shootChance *= frequencyMultiplier;
           }
         }
@@ -248,13 +248,13 @@ export class EnemyManager {
           // Different cooldowns based on bullet type
           if (this.currentLevel >= 30) {
             // Level 30+: Mixed bullet types, use average cooldown
-            this.bulletCooldown = 105 + Math.random() * 60; // 1.75-2.75 seconds
+            this.bulletCooldown = (GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN) / 2 + Math.random() * 60; // Average cooldown
           } else if (this.currentLevel >= 20) {
             // Level 20-29: Only red bullets
-            this.bulletCooldown = 90 + Math.random() * 60; // Red bullets: 1.5-2.5 seconds
+            this.bulletCooldown = GAME_CONFIG.ENEMY_BULLET_RED_COOLDOWN + Math.random() * 60; // Red bullets cooldown
           } else {
             // Level 10-19: Only green bullets
-            this.bulletCooldown = 120 + Math.random() * 60; // Green bullets: 2-3 seconds
+            this.bulletCooldown = GAME_CONFIG.ENEMY_BULLET_GREEN_COOLDOWN + Math.random() * 60; // Green bullets cooldown
           }
         }
       }
@@ -549,16 +549,16 @@ export class EnemyManager {
     
     if (isRedBullet) {
       // Red bullets - thick cylinders with high spread
-      bulletGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.5, 8);
+      bulletGeometry = new THREE.CylinderGeometry(GAME_CONFIG.ENEMY_BULLET_RED_SIZE, GAME_CONFIG.ENEMY_BULLET_RED_SIZE, 0.5, 8);
       bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff6666 });
-      bulletSpeed = 0.10;
-      spreadAmount = Math.PI / 3; // ±30 degrees
+      bulletSpeed = GAME_CONFIG.ENEMY_BULLET_RED_SPEED;
+      spreadAmount = GAME_CONFIG.ENEMY_BULLET_RED_SPREAD;
     } else {
       // Green bullets - large circles, easier to dodge
-      bulletGeometry = new THREE.SphereGeometry(0.3, 8, 6); // Twice as wide (0.15 * 2)
+      bulletGeometry = new THREE.SphereGeometry(GAME_CONFIG.ENEMY_BULLET_GREEN_SIZE, 8, 6);
       bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff66 });
-      bulletSpeed = 0.056; // 70% of 0.08 (0.08 * 0.7)
-      spreadAmount = Math.PI / 6; // ±15 degrees (less spread)
+      bulletSpeed = GAME_CONFIG.ENEMY_BULLET_GREEN_SPEED;
+      spreadAmount = GAME_CONFIG.ENEMY_BULLET_GREEN_SPREAD;
     }
     
     const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
@@ -583,11 +583,11 @@ export class EnemyManager {
     direction.y += verticalSpread;
     direction.normalize();
     
-    // For red bullets, constrain to max 30 degrees from straight down
+    // For red bullets, constrain to max angle from straight down
     if (isRedBullet) {
       const straightDown = new THREE.Vector3(0, -1, 0);
       const angleFromDown = direction.angleTo(straightDown);
-      const maxAngle = Math.PI / 6; // 30 degrees in radians
+      const maxAngle = GAME_CONFIG.ENEMY_BULLET_RED_MAX_ANGLE;
       
       if (angleFromDown > maxAngle) {
         // Clamp the direction to max 30 degrees from straight down
@@ -643,7 +643,7 @@ export class EnemyManager {
       
       // Remove bullet if it goes off screen or lives too long
       // Green bullets get longer lifetime to let trails fade naturally
-      const maxLifetime = bullet.userData.isGreen ? 600 : 300;
+      const maxLifetime = bullet.userData.isGreen ? GAME_CONFIG.ENEMY_BULLET_GREEN_LIFETIME : GAME_CONFIG.ENEMY_BULLET_RED_LIFETIME;
       if (bullet.position.y < -8 || bullet.userData.lifetime > maxLifetime) {
         // Clean up trail particles
         if (bullet.userData.isGreen) {
@@ -657,12 +657,12 @@ export class EnemyManager {
 
   createBulletTrail(bullet) {
     // Create scattered trail particles with random spacing
-    const trailLength = 6; // Fewer particles for more disconnected look
-    const baseTrailSpacing = 0.4; // Base distance between particles
+    const trailLength = GAME_CONFIG.GREEN_BULLET_TRAIL_LENGTH;
+    const baseTrailSpacing = GAME_CONFIG.GREEN_BULLET_TRAIL_BASE_SPACING;
     
     for (let i = 0; i < trailLength; i++) {
       // Create first trail particle
-      const trailGeometry1 = new THREE.SphereGeometry(0.06, 6, 4); // Slightly smaller
+      const trailGeometry1 = new THREE.SphereGeometry(GAME_CONFIG.GREEN_BULLET_TRAIL_PARTICLE_SIZE, 6, 4);
       const trailMaterial1 = new THREE.MeshBasicMaterial({ 
         color: 0x66ff66,
         transparent: true,
@@ -671,7 +671,7 @@ export class EnemyManager {
       const trailParticle1 = new THREE.Mesh(trailGeometry1, trailMaterial1);
       
       // Create second trail particle (180deg out of phase)
-      const trailGeometry2 = new THREE.SphereGeometry(0.06, 6, 4); // Slightly smaller
+      const trailGeometry2 = new THREE.SphereGeometry(GAME_CONFIG.GREEN_BULLET_TRAIL_PARTICLE_SIZE, 6, 4);
       const trailMaterial2 = new THREE.MeshBasicMaterial({ 
         color: 0x66ff66,
         transparent: true,
@@ -683,7 +683,7 @@ export class EnemyManager {
       const bulletDirection = bullet.userData.velocity.clone().normalize();
       
       // Add random spacing variation to make particles more disconnected
-      const randomSpacing = baseTrailSpacing + (Math.random() - 0.5) * 0.3; // ±0.15 variation
+      const randomSpacing = baseTrailSpacing + (Math.random() - 0.5) * GAME_CONFIG.GREEN_BULLET_TRAIL_SPACING_VARIATION;
       const trailOffset = bulletDirection.clone().multiplyScalar(-randomSpacing * (i + 1));
       
       // Position both trail particles behind bullet along its direction
@@ -694,13 +694,13 @@ export class EnemyManager {
       
       // Add random position offsets to scatter particles
       const randomOffset1 = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.2, // Random X offset
-        (Math.random() - 0.5) * 0.2, // Random Y offset
+        (Math.random() - 0.5) * GAME_CONFIG.GREEN_BULLET_TRAIL_RANDOM_OFFSET, // Random X offset
+        (Math.random() - 0.5) * GAME_CONFIG.GREEN_BULLET_TRAIL_RANDOM_OFFSET, // Random Y offset
         0
       );
       const randomOffset2 = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.2, // Random X offset
-        (Math.random() - 0.5) * 0.2, // Random Y offset
+        (Math.random() - 0.5) * GAME_CONFIG.GREEN_BULLET_TRAIL_RANDOM_OFFSET, // Random X offset
+        (Math.random() - 0.5) * GAME_CONFIG.GREEN_BULLET_TRAIL_RANDOM_OFFSET, // Random Y offset
         0
       );
       
@@ -722,14 +722,14 @@ export class EnemyManager {
       // Add sinuous wave pattern (propagates along trail length)
       const time = bullet.userData.lifetime * 0.1;
       const distanceFromBullet = i / (trailLength - 1); // 0 at bullet, 1 at end
-      // Taper only for first 5 pixels (about 0.1 units) from bullet
+      // Taper only for first few pixels from bullet
       const actualDistanceFromBullet = i * baseTrailSpacing;
-      const sineIntensity = actualDistanceFromBullet < 0.1 ? 0 : Math.pow((actualDistanceFromBullet - 0.1) / 2.0, 2);
+      const sineIntensity = actualDistanceFromBullet < GAME_CONFIG.GREEN_BULLET_TRAIL_TAPER_DISTANCE ? 0 : Math.pow((actualDistanceFromBullet - GAME_CONFIG.GREEN_BULLET_TRAIL_TAPER_DISTANCE) / 2.0, 2);
       
       // Create wave that propagates along the trail (not just time-based)
       const wavePhase = time * 1.5 - distanceFromBullet * 6; // Slower wave propagation
-      const sine1 = Math.sin(wavePhase) * 0.4 * sineIntensity; // Slightly reduced amplitude
-      const sine2 = Math.sin(wavePhase * 2) * 0.2 * sineIntensity; // Slightly reduced amplitude
+      const sine1 = Math.sin(wavePhase) * GAME_CONFIG.GREEN_BULLET_TRAIL_WAVE_AMPLITUDE_1 * sineIntensity;
+      const sine2 = Math.sin(wavePhase * 2) * GAME_CONFIG.GREEN_BULLET_TRAIL_WAVE_AMPLITUDE_2 * sineIntensity;
       
       // Apply sine waves perpendicular to bullet direction
       const perpendicular = new THREE.Vector3(-bulletDirection.y, bulletDirection.x, 0);
@@ -813,16 +813,16 @@ export class EnemyManager {
     
     if (this.currentLevel < 20) {
       // Green bullets (level 10-19) - solid green warning
-      enemy.userData.warningDuration = 90; // 1.5 seconds at 60fps
+      enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
       enemy.userData.warningType = 'green';
       // Change to green
       enemy.material.color.setHex(0x66ff66);
     } else if (this.currentLevel < 30) {
       // Red bullets (level 20-29) - dark red blinking warning
-      enemy.userData.warningDuration = 120; // 2 seconds at 60fps
+      enemy.userData.warningDuration = GAME_CONFIG.ENEMY_RED_WARNING_DURATION;
       enemy.userData.warningType = 'red';
       enemy.userData.blinkTimer = 0;
-      enemy.userData.blinkRate = 12; // Blink every 12 frames
+      enemy.userData.blinkRate = GAME_CONFIG.ENEMY_RED_WARNING_BLINK_RATE;
       // Start with dark red
       enemy.material.color.setHex(0x660000);
       
@@ -834,15 +834,15 @@ export class EnemyManager {
       // Level 30+: Mixed bullet types - randomly choose green or red
       if (Math.random() < 0.5) {
         // Green bullet (50% chance)
-        enemy.userData.warningDuration = 90; // 1.5 seconds at 60fps
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_GREEN_WARNING_DURATION;
         enemy.userData.warningType = 'green';
         enemy.material.color.setHex(0x66ff66);
       } else {
         // Red bullet (50% chance)
-        enemy.userData.warningDuration = 120; // 2 seconds at 60fps
+        enemy.userData.warningDuration = GAME_CONFIG.ENEMY_RED_WARNING_DURATION;
         enemy.userData.warningType = 'red';
         enemy.userData.blinkTimer = 0;
-        enemy.userData.blinkRate = 12; // Blink every 12 frames
+        enemy.userData.blinkRate = GAME_CONFIG.ENEMY_RED_WARNING_BLINK_RATE;
         enemy.material.color.setHex(0x660000);
         
         // Play charge up sound for red bullets

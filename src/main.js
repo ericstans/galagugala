@@ -8,6 +8,7 @@ import { EffectsManager } from './effects/EffectsManager.js';
 import { InputManager } from './input/InputManager.js';
 import { OverlayManager } from './ui/OverlayManager.js';
 import { CollisionManager } from './physics/CollisionManager.js';
+import { GAME_CONFIG } from './config/GameConstants.js';
 
 const DEBUG = false;
  
@@ -75,12 +76,12 @@ class Game {
     return 1; // Default to level 1
   }
 
-  // Calculate score for enemy destruction: 10 + 10 * floor((LEVEL-1)*0.5 + CHAIN*0.5)
+      // Calculate score for enemy destruction: 10 + 10 * floor((LEVEL-1)*0.5 + CHAIN*0.5)
   calculateEnemyScore(chainCount) {
-    const levelBonus = (this.currentLevel - 1) * 0.5;
-    const chainBonus = chainCount * 0.5;
+    const levelBonus = (this.currentLevel - 1) * GAME_CONFIG.SCORE_LEVEL_MULTIPLIER;
+    const chainBonus = chainCount * GAME_CONFIG.SCORE_CHAIN_MULTIPLIER;
     const multiplier = Math.floor(levelBonus + chainBonus);
-    return 10 + 10 * multiplier;
+    return GAME_CONFIG.SCORE_ENEMY_BASE + GAME_CONFIG.SCORE_ENEMY_BASE * multiplier;
   }
 
   // Add score and update display
@@ -235,7 +236,7 @@ class Game {
       
       // Start portal animation 2 seconds before respawn
       if (this.respawnDelay <= 2.0 && !this.portalStarted) {
-        const spawnPosition = new THREE.Vector3(0, -7.0, 0); // Just below the ship
+        const spawnPosition = new THREE.Vector3(0, GAME_CONFIG.PLAYER_PORTAL_POSITION_Y, 0);
         this.effects.startPortalAnimation(spawnPosition);
         this.portalStarted = true;
       }
@@ -243,8 +244,8 @@ class Game {
       if (this.respawnDelay <= 0) {
         this.respawnPlayer();
         this.portalStarted = false; // Reset portal flag
-        // Set 2-second delay before enemies can start diving again
-        this.enemyDiveDelay = 2.0;
+        // Set delay before enemies can start diving again
+        this.enemyDiveDelay = GAME_CONFIG.PLAYER_ENEMY_DIVE_DELAY;
       }
       
       // Always update effects (explosions, particles, etc.)
@@ -572,9 +573,9 @@ class Game {
         this.overlay.hideChainOnGameOver();
       } else {
         // Still have lives - start enemy pause and respawn delays
-        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting 3-second enemy pause, then 2-second respawn delay...`);
-        this.enemyPauseDelay = 3.0; // 3 seconds of enemy pause
-        this.respawnDelay = 5.0; // 5 seconds total (3 + 2) before respawn
+        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting ${GAME_CONFIG.PLAYER_ENEMY_PAUSE_DELAY}-second enemy pause, then ${GAME_CONFIG.PLAYER_ENEMY_DIVE_DELAY}-second respawn delay...`);
+        this.enemyPauseDelay = GAME_CONFIG.PLAYER_ENEMY_PAUSE_DELAY;
+        this.respawnDelay = GAME_CONFIG.PLAYER_RESPAWN_DELAY;
       }
       return;
     }
@@ -598,9 +599,9 @@ class Game {
         this.overlay.hideChainOnGameOver();
       } else {
         // Still have lives - start enemy pause and respawn delays
-        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting 3-second enemy pause, then 2-second respawn delay...`);
-        this.enemyPauseDelay = 3.0; // 3 seconds of enemy pause
-        this.respawnDelay = 5.0; // 5 seconds total (3 + 2) before respawn
+        if (DEBUG) console.log(`Player destroyed! Lives remaining: ${this.lives}. Starting ${GAME_CONFIG.PLAYER_ENEMY_PAUSE_DELAY}-second enemy pause, then ${GAME_CONFIG.PLAYER_ENEMY_DIVE_DELAY}-second respawn delay...`);
+        this.enemyPauseDelay = GAME_CONFIG.PLAYER_ENEMY_PAUSE_DELAY;
+        this.respawnDelay = GAME_CONFIG.PLAYER_RESPAWN_DELAY;
       }
       this.engine.setGameState({ explosionComplete: true });
       return;

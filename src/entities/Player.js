@@ -822,7 +822,7 @@ export class Player {
     }
     
     // Reset position
-    this.mesh.position.set(0, -6.5, 0);
+    this.mesh.position.set(0, GAME_CONFIG.PLAYER_SPAWN_POSITION_Y, 0);
     
     // Reset shooting cooldowns
     this.canShoot = true;
