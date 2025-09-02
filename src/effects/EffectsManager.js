@@ -376,7 +376,7 @@ export class EffectsManager {
     
     // Combine: GA + random selections + LA
     const title = 'GA' + randomSelections.join('') + 'LA';
-    console.log(`Generated random title: ${title}`);
+    if (DEBUG) console.log(`Generated random title: ${title}`);
     return title;
   }
 

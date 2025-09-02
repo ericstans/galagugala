@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../config/GameConstants.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 export class AudioManager {
   constructor() {
@@ -92,9 +92,9 @@ export class AudioManager {
       this.reverbDryGain.gain.value = 0.7; // Dry signal
       this.reverbWetGain.gain.value = 0.3; // Wet signal
       
-      console.log('Audio system initialized successfully');
+      if (DEBUG) console.log('Audio system initialized successfully');
     } catch (e) {
-      console.warn('Web Audio API not supported:', e);
+      if (DEBUG) console.warn('Web Audio API not supported:', e);
     }
   }
 
