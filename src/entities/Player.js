@@ -45,6 +45,7 @@ export class Player {
     // Power Up Level 2 system (after level 50)
     this.powerUpLevel = 1; // 1 = normal, 2 = enhanced wing fire rate
     this.wingFireRateMultiplier = 1.0; // Multiplier for wing fire rate
+    this.level50Completed = false; // Track if level 50 boss has been defeated
     
     if (DEBUG) console.log('Player created - no wings initially');
   }
@@ -571,13 +572,20 @@ export class Player {
   }
 
   upgradeToPowerUpLevel2() {
-    if (this.powerUpLevel === 1) {
+    if (this.powerUpLevel === 1 && this.level50Completed) {
       this.powerUpLevel = 2;
       this.wingFireRateMultiplier = 1.5; // 1.5x faster fire rate
       if (DEBUG) console.log('Player upgraded to Power Up Level 2 - wing fire rate increased by 1.5x');
       return true;
+    } else if (this.powerUpLevel === 1 && !this.level50Completed) {
+      if (DEBUG) console.log('Cannot upgrade to Power Up Level 2 - level 50 boss not yet defeated');
     }
     return false;
+  }
+
+  markLevel50Completed() {
+    this.level50Completed = true;
+    if (DEBUG) console.log('Level 50 boss defeated - Power Up Level 2 now available');
   }
 
   update(inputManager, gameState, gameEngine) {
@@ -752,6 +760,17 @@ export class Player {
     }
   }
 
+  setInvulnerable(invulnerable) {
+    this.isInvulnerable = invulnerable;
+    if (DEBUG) console.log(`Invulnerability ${this.isInvulnerable ? 'ON' : 'OFF'} (forced)`);
+    
+    if (this.isInvulnerable) {
+      this.startInvulnerabilityFlash();
+    } else {
+      this.stopInvulnerabilityFlash();
+    }
+  }
+
   startInvulnerabilityFlash() {
     // Store original materials
     this.storeOriginalMaterials(this.mesh);
@@ -796,14 +815,15 @@ export class Player {
   updateInvulnerabilityFlash() {
     if (this.isInvulnerable) {
       this.invulnerabilityFlashTimer++;
-      const flashSpeed = 0.2;
+      const flashSpeed = 0.1; // Reduced by half from 0.2
       const opacity = 0.3 + 0.7 * Math.abs(Math.sin(this.invulnerabilityFlashTimer * flashSpeed));
       
-      // Apply flashing effect to all materials
+      // Apply flashing effect to ship components (excluding shield)
       this.applyFlashEffect(this.mesh, opacity);
       if (this.cockpit) this.applyFlashEffect(this.cockpit, opacity);
       if (this.leftWing) this.applyFlashEffect(this.leftWing, opacity);
       if (this.rightWing) this.applyFlashEffect(this.rightWing, opacity);
+      // Note: shieldBubble is intentionally excluded from flashing
     }
   }
 
@@ -867,6 +887,12 @@ export class Player {
         this.rightWing = null;
         console.log('Right wing removed on reset');
       }
+      
+      // Reset Power Up Level 2 system on game restart
+      this.powerUpLevel = 1;
+      this.wingFireRateMultiplier = 1.0;
+      this.level50Completed = false;
+      console.log('Power Up Level 2 system reset');
     } else {
       console.log('Wings preserved for level progression');
     }

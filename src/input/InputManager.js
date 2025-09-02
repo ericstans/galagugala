@@ -9,6 +9,7 @@ export class InputManager {
     };
     this.autoShoot = this.isMobile; // Auto-shoot on mobile
     this.iKeyWasPressed = false; // Track I key state for debounce
+    this.cheatsEnabled = this.checkCheatsParameter();
     this.setupEventListeners();
   }
 
@@ -16,6 +17,16 @@ export class InputManager {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
            ('ontouchstart' in window) ||
            (navigator.maxTouchPoints > 0);
+  }
+
+  checkCheatsParameter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('cheats') === '1';
+  }
+
+  checkInvulnerableParameter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return this.cheatsEnabled && urlParams.get('invulnerable') === '1';
   }
 
   setupEventListeners() {
@@ -136,14 +147,16 @@ export class InputManager {
   }
 
   isManualPowerUpPressed() {
-    return this.isPressed('KeyP');
+    return this.cheatsEnabled && this.isPressed('KeyP');
   }
 
   isManualRedPowerUpPressed() {
-    return this.isPressed('KeyR');
+    return this.cheatsEnabled && this.isPressed('KeyR');
   }
 
   isInvulnerabilityTogglePressed() {
+    if (!this.cheatsEnabled) return false;
+    
     // Use isPressed but with debounce to prevent multiple toggles
     if (this.isPressed('KeyI') && !this.iKeyWasPressed) {
       this.iKeyWasPressed = true;
@@ -166,5 +179,10 @@ export class InputManager {
   // Get auto-shoot status
   getAutoShoot() {
     return this.autoShoot;
+  }
+
+  // Check if invulnerability should be forced via URL parameter
+  shouldForceInvulnerability() {
+    return this.checkInvulnerableParameter();
   }
 }

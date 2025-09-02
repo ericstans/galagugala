@@ -206,6 +206,12 @@ class Game {
         // Show player ship
         this.player.show();
         
+        // Force invulnerability if URL parameter is set (requires cheats=1)
+        if (this.input.shouldForceInvulnerability()) {
+          this.player.setInvulnerable(true);
+          if (DEBUG) console.log('Forced invulnerability enabled via URL parameter at game start');
+        }
+        
         // Start audio
         if (!this.audioStarted && this.audio.audioContext) {
           this.audio.audioContext.resume();
@@ -405,6 +411,11 @@ class Game {
             return;
           }
           
+          // Check if this is the level 50 boss (first boss)
+          if (this.currentLevel === 50) {
+            this.player.markLevel50Completed();
+          }
+          
           // Stop the lead synth immediately when boss explodes
           this.audio.stopLeadSynth();
           
@@ -482,6 +493,11 @@ class Game {
             // Final boss destroyed - start dramatic explosion sequence
             this.startFinalBossExplosion(enemy);
             return;
+          }
+          
+          // Check if this is the level 50 boss (first boss)
+          if (this.currentLevel === 50) {
+            this.player.markLevel50Completed();
           }
           
           // Stop the lead synth immediately when boss explodes
@@ -646,6 +662,11 @@ class Game {
             this.addScore(bossDestroyScore);
             this.overlay.createScorePopup(bossDestroyScore, enemy.position, this.engine.camera, this.engine.renderer);
             
+            // Check if this is the level 50 boss (first boss)
+            if (this.currentLevel === 50) {
+              this.player.markLevel50Completed();
+            }
+            
             // Remove boss
             this.enemies.removeEnemy(enemy, (position) => {
               this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
@@ -704,6 +725,11 @@ class Game {
               const bossDestroyScore = 1000;
               this.addScore(bossDestroyScore);
               this.overlay.createScorePopup(bossDestroyScore, enemyCollision.enemy.position, this.engine.camera, this.engine.renderer);
+              
+              // Check if this is the level 50 boss (first boss)
+              if (this.currentLevel === 50) {
+                this.player.markLevel50Completed();
+              }
               
               // Remove boss
               this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
@@ -887,6 +913,12 @@ class Game {
     
     // Reset player position and state (preserve invulnerability)
     this.player.reset(false, false);
+    
+    // Force invulnerability if URL parameter is set (requires cheats=1)
+    if (this.input.shouldForceInvulnerability()) {
+      this.player.setInvulnerable(true);
+      if (DEBUG) console.log('Forced invulnerability enabled via URL parameter');
+    }
     
     // Clear all enemies and power-ups
     this.enemies.clearAll();
