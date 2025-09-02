@@ -824,18 +824,6 @@ export class Player {
     // Reset position
     this.mesh.position.set(0, -6.5, 0);
     
-    // Clear all bullets
-    this.bullets.forEach(bullet => {
-      this.scene.remove(bullet);
-    });
-    this.bullets = [];
-    
-    // Clear wing bullets
-    this.wingBullets.forEach(bullet => {
-      this.scene.remove(bullet);
-    });
-    this.wingBullets = [];
-    
     // Reset shooting cooldowns
     this.canShoot = true;
     this.canShootWings = true;
