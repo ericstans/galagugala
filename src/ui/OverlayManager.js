@@ -442,13 +442,28 @@ export class OverlayManager {
     const x = (vector.x * 0.5 + 0.5) * canvas.clientWidth + canvasRect.left;
     const y = (vector.y * -0.5 + 0.5) * canvas.clientHeight + canvasRect.top;
     
+    // Calculate dynamic font size based on score value
+    const baseFontSize = 1.5; // Base font size in rem
+    const maxFontSize = 4.0;  // Maximum font size in rem
+    const minFontSize = 1.0;  // Minimum font size in rem
+    
+    // Scale font size based on score (logarithmic scaling for better visual progression)
+    let fontSize = baseFontSize;
+    if (score > 10) {
+      // Use logarithmic scaling: fontSize = baseFontSize + log(score/10) * scaleFactor
+      const scaleFactor = 0.8;
+      fontSize = baseFontSize + Math.log(score / 10) * scaleFactor;
+      fontSize = Math.min(fontSize, maxFontSize); // Cap at maximum
+      fontSize = Math.max(fontSize, minFontSize); // Floor at minimum
+    }
+    
     // Create popup element
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.left = x + 'px';
     popup.style.top = y + 'px';
     popup.style.transform = 'translate(-50%, -50%)';
-    popup.style.fontSize = '1.5rem';
+    popup.style.fontSize = fontSize + 'rem';
     popup.style.fontWeight = 'bold';
     popup.style.color = '#00fffc';
     popup.style.fontFamily = 'Courier New, monospace';

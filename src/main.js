@@ -325,9 +325,20 @@ class Game {
           console.log(`Wing upgrade: ${powerUpResult.wingsAdded.join(', ')} wing(s) added!`);
         }
         
-        // Handle chain updates for blue power-ups
+        // Handle chain updates and score bonus for blue power-ups
         if (powerUpResult.type === 'blue' && powerUpResult.chainCount !== undefined) {
           this.overlay.updateChain(powerUpResult.chainCount);
+          
+          // Add score bonus: 10^CHAIN
+          if (powerUpResult.scoreBonus !== undefined) {
+            this.addScore(powerUpResult.scoreBonus);
+            console.log(`Blue power-up score bonus: ${powerUpResult.scoreBonus} points (10^${powerUpResult.chainCount})`);
+            
+            // Show score popup at power-up position
+            if (powerUpResult.position) {
+              this.overlay.createScorePopup(powerUpResult.scoreBonus, powerUpResult.position, this.engine.camera, this.engine.renderer);
+            }
+          }
         }
       }
     }
@@ -455,6 +466,17 @@ class Game {
     this.currentLevel++;
     console.log(`Starting level ${this.currentLevel}...`);
     
+    // Check if this is a plasma storm level (every 10 levels)
+    if (this.currentLevel % 10 === 0) {
+      this.startPlasmaStorm();
+      return; // Don't proceed with normal level start yet
+    }
+    
+    // Normal level progression
+    this.proceedToNextLevel();
+  }
+
+  proceedToNextLevel() {
     // Update level display
     this.overlay.updateLevel(this.currentLevel);
     
@@ -483,6 +505,55 @@ class Game {
     this.audio.updateSoundtrack(this.currentLevel);
     
     console.log(`Level ${this.currentLevel} started!`);
+  }
+
+  startPlasmaStorm() {
+    console.log(`Plasma Storm event triggered for level ${this.currentLevel}!`);
+    
+    // Update level display immediately for plasma storm level
+    this.overlay.updateLevel(this.currentLevel);
+    
+    // Delay 0.5 seconds, then play voice announcement
+    setTimeout(() => {
+      this.audio.createRobotSpeech("Incoming Plasma Storm");
+      
+      // Wait another 1.5 seconds, then start power-up flood
+      setTimeout(() => {
+        this.floodPowerUps();
+      }, 1500);
+    }, 500);
+  }
+
+  floodPowerUps() {
+    console.log("Starting power-up flood!");
+    
+    // Spawn power-ups 30 times per second for 5 seconds (150 total spawns)
+    const spawnInterval = 1000 / 30; // ~33ms between spawns
+    const totalSpawns = 100; // 3 per second * 5 seconds
+    let spawnCount = 0;
+    
+    const spawnPowerUp = () => {
+      if (spawnCount < totalSpawns) {
+        // Create blue power-up at random position above the screen
+        const bounds = this.engine.getVisibleBounds();
+        const randomX = bounds.left + Math.random() * bounds.width;
+        const randomY = bounds.top + 1; // Above the top of the screen
+        
+        this.powerUps.createPowerUp('blue', { x: randomX, y: randomY, z: 0 });
+        spawnCount++;
+        
+        // Schedule next spawn
+        setTimeout(spawnPowerUp, spawnInterval);
+      } else {
+        // All power-ups spawned, proceed to next level after a short delay
+        setTimeout(() => {
+          this.proceedToNextLevel();
+        }, 5000);
+      }
+    };
+    
+    // Start the flood
+    spawnPowerUp();
   }
 
   restartGame() {

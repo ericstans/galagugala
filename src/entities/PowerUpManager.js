@@ -163,6 +163,9 @@ export class PowerUpManager {
         // Play power-up collection sound (red power-ups use base pitch)
         audioManager.playPowerUp(1);
         
+        // Announce "Power Up" with robot voice
+        audioManager.createRobotSpeech("Power Up");
+        
         // Add both wings if missing
         let wingsAdded = [];
         if (!player.leftWing || player.leftWing.userData.isDestroyed) {
@@ -188,7 +191,10 @@ export class PowerUpManager {
         // Play power-up collection sound with current chain count (higher pitch for longer chains)
         audioManager.playPowerUp(this.chainCount);
         
-        return { type: 'blue', chainCount: this.chainCount };
+        // Calculate score bonus: 2^CHAIN
+        const scoreBonus = Math.pow(2, this.chainCount);
+        
+        return { type: 'blue', chainCount: this.chainCount, scoreBonus: scoreBonus, position: powerUp.position };
       }
     }
     return null;
