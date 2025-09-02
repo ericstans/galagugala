@@ -434,6 +434,9 @@ export class EffectsManager {
     
     this.scene.add(textGroup);
     this.introText = textGroup;
+    
+    // Return the generated title for robot voice announcement
+    return title;
   }
 
   removeIntroText() {

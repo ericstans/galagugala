@@ -183,7 +183,7 @@ export class PowerUpManager {
         }
       } else {
         if (debug) console.log('Blue power-up collected! (Standard effect)');
-        this.incrementChain();
+        this.incrementChain(audioManager);
         
         // Play power-up collection sound with current chain count (higher pitch for longer chains)
         audioManager.playPowerUp(this.chainCount);
@@ -221,9 +221,17 @@ export class PowerUpManager {
   }
 
   // Chain mechanic methods
-  incrementChain() {
+  incrementChain(audioManager = null) {
     this.chainCount++;
     console.log(`Chain incremented to ${this.chainCount}`);
+    
+    // Trigger robot voice announcement for every 5th chain
+    if (this.chainCount % 5 === 0 && audioManager) {
+      const announcement = `${this.chainCount} chain`;
+      console.log(`Robot announcement: ${announcement}`);
+      // Use the truly flat robot voice for maximum monotone effect
+      audioManager.createRobotSpeech(announcement);
+    }
   }
 
   resetChain(audioManager = null) {

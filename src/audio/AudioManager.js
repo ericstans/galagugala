@@ -557,7 +557,7 @@ export class AudioManager {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
       const saturationGain = this.audioContext.createGain();
-      const bitcrusher = this.audioContext.createScriptProcessor(4096, 1, 1);
+      const bitcrusher = this.audioContext.createWaveShaper();
       const lowpassFilter = this.audioContext.createBiquadFilter();
       
       // Create audio chain: oscillator -> saturation -> bitcrusher -> lowpass -> gain -> master
@@ -573,18 +573,16 @@ export class AudioManager {
       // Mild saturation (slight overdrive)
       saturationGain.gain.setValueAtTime(1.2, this.audioContext.currentTime);
       
-      // Bitcrushing effect
-      bitcrusher.onaudioprocess = function(e) {
-        const input = e.inputBuffer.getChannelData(0);
-        const output = e.outputBuffer.getChannelData(0);
-        const bits = 8; // Reduce from 32-bit to 8-bit
-        const steps = Math.pow(2, bits);
-        
-        for (let i = 0; i < input.length; i++) {
-          // Quantize the signal
-          output[i] = Math.round(input[i] * steps) / steps;
-        }
-      };
+      // Bitcrushing effect using WaveShaper
+      const bitcrushCurve = new Float32Array(65536);
+      const bits = 8; // Reduce from 32-bit to 8-bit
+      const steps = Math.pow(2, bits);
+      
+      for (let i = 0; i < 65536; i++) {
+        const x = (i - 32768) / 32768;
+        bitcrushCurve[i] = Math.round(x * steps) / steps;
+      }
+      bitcrusher.curve = bitcrushCurve;
       
       // Low-pass filter for warmth
       lowpassFilter.type = 'lowpass';
@@ -723,5 +721,71 @@ export class AudioManager {
     Object.keys(this.soundtrackLayers).forEach(layer => {
       this.stopLayer(layer);
     });
+  }
+
+  // Robot voice using Web Speech API with robot-like parameters
+  createRobotSpeech(text, rate = 1.2) {
+    if (!('speechSynthesis' in window)) {
+      console.warn('Speech synthesis not supported');
+      return;
+    }
+    
+    // Cancel any existing speech to avoid overlapping
+    speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Robot-like parameters - maximum flatness
+    utterance.pitch = 0.1;        // Extremely low pitch
+    utterance.rate = rate;        // Configurable rate (default: faster pace)
+    utterance.volume = 0.7;       // Clear volume
+    
+    // Function to set up the voice and speak
+    const speakWithVoice = () => {
+      // Try to find a voice that sounds more robotic
+      const voices = speechSynthesis.getVoices();
+      const robotVoice = voices.find(voice => 
+        voice.name.includes('Robot') || 
+        voice.name.includes('Synthetic') ||
+        voice.name.includes('Neural') ||
+        voice.name.includes('Microsoft') ||
+        voice.name.includes('Google') ||
+        voice.name.includes('Alex') ||
+        voice.name.includes('Daniel') ||
+        voice.name.includes('Fiona')
+      );
+      
+      if (robotVoice) {
+        utterance.voice = robotVoice;
+        console.log(`Using robot voice: ${robotVoice.name}`);
+      } else {
+        console.log('No robot voice found, using default voice with robot parameters');
+      }
+      
+      // Add event listeners
+      utterance.onstart = () => {
+        console.log('Robot speech started');
+      };
+      
+      utterance.onend = () => {
+        console.log('Robot speech ended');
+      };
+      
+      speechSynthesis.speak(utterance);
+    };
+    
+    // If voices are already loaded, speak immediately
+    if (speechSynthesis.getVoices().length > 0) {
+      speakWithVoice();
+    } else {
+      // Wait for voices to load
+      speechSynthesis.onvoiceschanged = speakWithVoice;
+    }
+  }
+
+  // Public method to trigger robot speech
+  playRobot(text) {
+    if (!this.audioContext) return;
+    this.createRobotSpeech(text);
   }
 }

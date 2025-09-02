@@ -82,8 +82,12 @@ class Game {
     // Show start overlay
     this.overlay.showStartOverlay();
     
-    // Create intro text
-    this.effects.createIntroText();
+    // Create intro text and announce the random title
+    const randomTitle = this.effects.createIntroText();
+    // Announce the random title with robot voice (slower rate)
+    setTimeout(() => {
+      this.audio.createRobotSpeech(randomTitle, 0.6);
+    }, 1000); // Delay to let the intro settle
     
     // Start minimal render loop for intro screen
     this.startIntroRenderLoop();
@@ -381,6 +385,7 @@ class Game {
       this.engine.setGameState({ explosionComplete: true });
       console.log('Player destroyed! Starting Game Over animation...');
       this.audio.playGameOver();
+      this.audio.createRobotSpeech("GAME OVER");
       this.effects.startGameOverAnimation();
       // Hide chain display on game over
       this.overlay.hideChainOnGameOver();
@@ -391,6 +396,7 @@ class Game {
     if (gameState.playerDestroyed && !this.effects.gameOverAnimation) {
       console.log('Player destroyed! Starting Game Over animation immediately...');
       this.audio.playGameOver();
+      this.audio.createRobotSpeech("GAME OVER");
       this.effects.startGameOverAnimation();
       // Hide chain display on game over
       this.overlay.hideChainOnGameOver();
