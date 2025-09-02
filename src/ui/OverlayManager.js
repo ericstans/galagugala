@@ -651,13 +651,18 @@ export class OverlayManager {
       
       // Instructions
       const instructions = document.createElement('div');
-      instructions.textContent = 'Press ENTER to restart';
+      instructions.textContent = this.isMobile() ? 'Tap to restart' : 'Press ENTER to restart';
       instructions.style.cssText = `
         font-size: 1.2em;
         color: #cccccc;
         margin-top: 20px;
+        cursor: pointer;
+        user-select: none;
       `;
       finalScoreOverlay.appendChild(instructions);
+      
+      // Add restart functionality
+      this.setupFinalScoreRestart(finalScoreOverlay);
       
       document.body.appendChild(finalScoreOverlay);
     }
@@ -670,5 +675,38 @@ export class OverlayManager {
     
     // Show the overlay
     finalScoreOverlay.style.display = 'flex';
+  }
+
+  setupFinalScoreRestart(finalScoreOverlay) {
+    const restart = () => {
+      // Hide the final score overlay
+      finalScoreOverlay.style.display = 'none';
+      
+      // Trigger page reload to restart the game
+      window.location.reload();
+    };
+
+    // Keyboard event listener for ENTER key
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter') {
+        restart();
+      }
+    };
+
+    // Touch event listener for mobile
+    const handleTouch = (e) => {
+      e.preventDefault();
+      restart();
+    };
+
+    // Add event listeners
+    document.addEventListener('keydown', handleKeyPress);
+    finalScoreOverlay.addEventListener('touchstart', handleTouch);
+    
+    // Store cleanup function on the overlay for potential future use
+    finalScoreOverlay._cleanupRestart = () => {
+      document.removeEventListener('keydown', handleKeyPress);
+      finalScoreOverlay.removeEventListener('touchstart', handleTouch);
+    };
   }
 }

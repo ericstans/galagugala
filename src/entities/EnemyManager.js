@@ -307,6 +307,12 @@ export class EnemyManager {
         enemy.position.x = Math.sin(enemy.userData.moveTime) * enemy.userData.moveRange;
         
         // Handle boss firing (with increased fire rate and yellow bullet frequency when damaged)
+        // Check if boss is still in initial firing delay period
+        if (enemy.userData.fireDelay > 0) {
+          enemy.userData.fireDelay--;
+          return; // Skip firing during delay period
+        }
+        
         if (enemy.userData.fireCooldown > 0) {
           enemy.userData.fireCooldown--;
         } else {
@@ -1098,6 +1104,7 @@ export class EnemyManager {
       isBoss: true,
       rotationSpeed: 0.02, // Same rotation speed for all cubes
       fireCooldown: 0, // Boss firing cooldown (30 frames = 0.5 seconds at 60fps)
+      fireDelay: 180, // 3 seconds delay before boss can start firing (180 frames at 60fps)
       currentBulletType: 0, // Index for cycling through bullet types
       bulletTypes: ['green', 'red', 'yellow'], // Available bullet types
       moveSpeed: 2.0, // Horizontal movement speed
@@ -1160,12 +1167,13 @@ export class EnemyManager {
     const bossGroup = new THREE.Group();
     bossGroup.userData = {
       type: 'finalBoss',
-      health: 200, // Final boss takes 200 hits to destroy
-      maxHealth: 200,
+      health: 400, // Final boss takes 400 hits to destroy
+      maxHealth: 400,
       isBoss: true,
       isFinalBoss: true, // Special flag for final boss
       rotationSpeed: 0.03, // Faster rotation than level 50 boss
       fireCooldown: 0, // Boss firing cooldown (20 frames = 0.33 seconds at 60fps)
+      fireDelay: 180, // 3 seconds delay before boss can start firing (180 frames at 60fps)
       currentBulletType: 0, // Index for cycling through bullet types
       bulletTypes: ['green', 'red', 'yellow'], // Available bullet types
       moveSpeed: 3.0, // Faster horizontal movement
