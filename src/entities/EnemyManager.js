@@ -656,50 +656,80 @@ export class EnemyManager {
   }
 
   createBulletTrail(bullet) {
-    // Create trail particles with double-sine wave pattern
-    const trailLength = 8; // Number of trail particles
-    const trailSpacing = 0.3; // Distance between particles
+    // Create scattered trail particles with random spacing
+    const trailLength = 6; // Fewer particles for more disconnected look
+    const baseTrailSpacing = 0.4; // Base distance between particles
     
     for (let i = 0; i < trailLength; i++) {
       // Create first trail particle
-      const trailGeometry1 = new THREE.SphereGeometry(0.08, 6, 4);
+      const trailGeometry1 = new THREE.SphereGeometry(0.06, 6, 4); // Slightly smaller
       const trailMaterial1 = new THREE.MeshBasicMaterial({ 
         color: 0x66ff66,
         transparent: true,
-        opacity: 0.6 - (i * 0.05) // Fade out along trail
+        opacity: 0.7 - (i * 0.08) // Fade out along trail
       });
       const trailParticle1 = new THREE.Mesh(trailGeometry1, trailMaterial1);
       
       // Create second trail particle (180deg out of phase)
-      const trailGeometry2 = new THREE.SphereGeometry(0.08, 6, 4);
+      const trailGeometry2 = new THREE.SphereGeometry(0.06, 6, 4); // Slightly smaller
       const trailMaterial2 = new THREE.MeshBasicMaterial({ 
         color: 0x66ff66,
         transparent: true,
-        opacity: 0.6 - (i * 0.05) // Fade out along trail
+        opacity: 0.7 - (i * 0.08) // Fade out along trail
       });
       const trailParticle2 = new THREE.Mesh(trailGeometry2, trailMaterial2);
       
       // Calculate bullet direction for positioning and rotation
       const bulletDirection = bullet.userData.velocity.clone().normalize();
       
+      // Add random spacing variation to make particles more disconnected
+      const randomSpacing = baseTrailSpacing + (Math.random() - 0.5) * 0.3; // ±0.15 variation
+      const trailOffset = bulletDirection.clone().multiplyScalar(-randomSpacing * (i + 1));
+      
       // Position both trail particles behind bullet along its direction
       trailParticle1.position.copy(bullet.position);
       trailParticle2.position.copy(bullet.position);
-      const trailOffset = bulletDirection.clone().multiplyScalar(-trailSpacing * (i + 1));
       trailParticle1.position.add(trailOffset);
       trailParticle2.position.add(trailOffset);
+      
+      // Add random position offsets to scatter particles
+      const randomOffset1 = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.2, // Random X offset
+        (Math.random() - 0.5) * 0.2, // Random Y offset
+        0
+      );
+      const randomOffset2 = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.2, // Random X offset
+        (Math.random() - 0.5) * 0.2, // Random Y offset
+        0
+      );
+      
+      trailParticle1.position.add(randomOffset1);
+      trailParticle2.position.add(randomOffset2);
+      
+      // Store random data for consistent updates
+      trailParticle1.userData = {
+        randomOffset: randomOffset1,
+        randomSpacing: randomSpacing,
+        trailIndex: i
+      };
+      trailParticle2.userData = {
+        randomOffset: randomOffset2,
+        randomSpacing: randomSpacing,
+        trailIndex: i
+      };
       
       // Add sinuous wave pattern (propagates along trail length)
       const time = bullet.userData.lifetime * 0.1;
       const distanceFromBullet = i / (trailLength - 1); // 0 at bullet, 1 at end
       // Taper only for first 5 pixels (about 0.1 units) from bullet
-      const actualDistanceFromBullet = i * trailSpacing;
+      const actualDistanceFromBullet = i * baseTrailSpacing;
       const sineIntensity = actualDistanceFromBullet < 0.1 ? 0 : Math.pow((actualDistanceFromBullet - 0.1) / 2.0, 2);
       
       // Create wave that propagates along the trail (not just time-based)
       const wavePhase = time * 1.5 - distanceFromBullet * 6; // Slower wave propagation
-      const sine1 = Math.sin(wavePhase) * 0.5 * sineIntensity; // Higher amplitude
-      const sine2 = Math.sin(wavePhase * 2) * 0.25 * sineIntensity; // Higher amplitude
+      const sine1 = Math.sin(wavePhase) * 0.4 * sineIntensity; // Slightly reduced amplitude
+      const sine2 = Math.sin(wavePhase * 2) * 0.2 * sineIntensity; // Slightly reduced amplitude
       
       // Apply sine waves perpendicular to bullet direction
       const perpendicular = new THREE.Vector3(-bulletDirection.y, bulletDirection.x, 0);
@@ -718,7 +748,6 @@ export class EnemyManager {
   }
 
   updateBulletTrail(bullet) {
-    const trailSpacing = 0.3;
     const time = bullet.userData.lifetime * 0.1;
     const trailLength = bullet.userData.trailParticles.length / 2; // Divide by 2 since we have 2 trails per position
     
@@ -726,25 +755,29 @@ export class EnemyManager {
     const bulletDirection = bullet.userData.velocity.clone().normalize();
     
     bullet.userData.trailParticles.forEach((particle, index) => {
-      // Calculate which trail segment this particle belongs to
-      const trailSegment = Math.floor(index / 2);
+      // Get stored random data
+      const particleData = particle.userData;
+      const trailSegment = particleData.trailIndex;
       const isFirstTrail = index % 2 === 0;
       
-      // Update position to follow bullet along its direction
+      // Update position to follow bullet along its direction with stored random spacing
       particle.position.copy(bullet.position);
-      const trailOffset = bulletDirection.clone().multiplyScalar(-trailSpacing * (trailSegment + 1));
+      const trailOffset = bulletDirection.clone().multiplyScalar(-particleData.randomSpacing * (trailSegment + 1));
       particle.position.add(trailOffset);
+      
+      // Reapply stored random offset to maintain scattered appearance
+      particle.position.add(particleData.randomOffset);
       
       // Add sinuous wave pattern (propagates along trail length)
       const distanceFromBullet = trailSegment / (trailLength - 1); // 0 at bullet, 1 at end
       // Taper only for first 5 pixels (about 0.1 units) from bullet
-      const actualDistanceFromBullet = trailSegment * trailSpacing;
+      const actualDistanceFromBullet = trailSegment * particleData.randomSpacing;
       const sineIntensity = actualDistanceFromBullet < 0.1 ? 0 : Math.pow((actualDistanceFromBullet - 0.1) / 2.0, 2);
       
       // Create wave that propagates along the trail (not just time-based)
       const wavePhase = time * 1.5 - distanceFromBullet * 6; // Slower wave propagation
-      const sine1 = Math.sin(wavePhase) * 0.5 * sineIntensity; // Higher amplitude
-      const sine2 = Math.sin(wavePhase * 2) * 0.25 * sineIntensity; // Higher amplitude
+      const sine1 = Math.sin(wavePhase) * 0.4 * sineIntensity; // Slightly reduced amplitude
+      const sine2 = Math.sin(wavePhase * 2) * 0.2 * sineIntensity; // Slightly reduced amplitude
       
       // Apply sine waves perpendicular to bullet direction
       const perpendicular = new THREE.Vector3(-bulletDirection.y, bulletDirection.x, 0);
@@ -758,7 +791,7 @@ export class EnemyManager {
       }
       
       // Fade out over time
-      const fadeAmount = 0.6 - (trailSegment * 0.05) - (bullet.userData.lifetime * 0.001);
+      const fadeAmount = 0.7 - (trailSegment * 0.08) - (bullet.userData.lifetime * 0.001);
       particle.material.opacity = Math.max(0, fadeAmount);
     });
   }
