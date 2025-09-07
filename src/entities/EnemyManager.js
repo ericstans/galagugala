@@ -10,10 +10,16 @@ export class EnemyManager {
     this.diveCooldown = 0;
     this.gameStartTimer = 0;
     this.enemyGeometry = new THREE.BoxGeometry(GAME_CONFIG.ENEMY_BASE_SIZE, GAME_CONFIG.ENEMY_BASE_SIZE, 0.3);
+    // Shared material for all enemies (avoid cloning per enemy)
     this.enemyMaterial = new THREE.MeshBasicMaterial({ 
       color: 0xff3333,
       transparent: false,
       opacity: 1.0
+    });
+    // Shared edge material
+    this.enemyEdgeMaterial = new THREE.LineBasicMaterial({
+      color: 0xcc1111,
+      linewidth: 1
     });
     this.initialColumnStructure = {}; // Track initial column structure
     this.processedColumns = new Set(); // Track which columns have already spawned power-ups
@@ -100,31 +106,11 @@ export class EnemyManager {
     
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
-        const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
-        
-        // Add thicker darker red edges using multiple overlapping lines
-        const edgeGeometry = new THREE.EdgesGeometry(scaledGeometry);
-        const edgeMaterial = new THREE.LineBasicMaterial({ 
-          color: 0xcc1111, // Darker red
-          linewidth: 1
-        });
-        
-        // Create multiple line segments with slight offsets to simulate thickness
-        const offsets = [
-          { x: 0, y: 0, z: 0 },
-          { x: 0.01, y: 0, z: 0 },
-          { x: -0.01, y: 0, z: 0 },
-          { x: 0, y: 0.01, z: 0 },
-          { x: 0, y: -0.01, z: 0 },
-          { x: 0, y: 0, z: 0.01 },
-          { x: 0, y: 0, z: -0.01 }
-        ];
-        
-        offsets.forEach(offset => {
-          const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-          edges.position.set(offset.x, offset.y, offset.z);
-          enemy.add(edges);
-        });
+  const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial);
+  // Single edges overlay (dramatically fewer draw calls)
+  const edgeGeometry = new THREE.EdgesGeometry(scaledGeometry);
+  const edges = new THREE.LineSegments(edgeGeometry, this.enemyEdgeMaterial);
+  enemy.add(edges);
         
         // Center the formation within the visible bounds
         const formationX = (col - (totalCols - 1) / 2) * clampedXSpacing;
