@@ -715,12 +715,12 @@ class Game {
           this.player.deactivateShield();
           
           // Check if this is a boss
-          if (enemyCollision.enemy.userData.isBoss) {
+          if (enemyCollision.userData && enemyCollision.userData.isBoss) {
             // Boss hit - reduce health instead of destroying
-            enemyCollision.enemy.userData.health--;
+            enemyCollision.userData.health--;
             
             // Check if boss is destroyed
-            if (enemyCollision.enemy.userData.health <= 0) {
+            if (enemyCollision.userData.health <= 0) {
               // Boss destroyed - give large bonus score
               const bossDestroyScore = 1000;
               this.addScore(bossDestroyScore);
@@ -738,7 +738,7 @@ class Game {
             }
           } else {
             // Normal enemy - remove immediately
-            this.enemies.removeEnemy(enemyCollision.enemy, (position) => {
+            this.enemies.removeEnemy(enemyCollision, (position) => {
               this.powerUps.spawnPowerUpOnColumnDestroyed(this.player, position, this.currentLevel);
             });
           }
