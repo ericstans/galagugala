@@ -7,10 +7,11 @@ export class InputManager {
       left: false,
       right: false
     };
-    this.autoShoot = this.isMobile; // Auto-shoot on mobile
-    this.iKeyWasPressed = false; // Track I key state for debounce
-    this.cheatsEnabled = this.checkCheatsParameter();
-    this.setupEventListeners();
+  this.autoShoot = this.isMobile; // Auto-shoot on mobile
+  this.iKeyWasPressed = false; // Track I key state for debounce
+  this.cheatsEnabled = this.checkCheatsParameter();
+  this.lastDirection = null; // Track most recently pressed direction
+  this.setupEventListeners();
   }
 
   detectMobile() {
@@ -32,9 +33,20 @@ export class InputManager {
   setupEventListeners() {
     window.addEventListener('keydown', (e) => { 
       this.keys[e.code] = true; 
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        this.lastDirection = 'left';
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        this.lastDirection = 'right';
+      }
     });
     window.addEventListener('keyup', (e) => { 
       this.keys[e.code] = false; 
+      // If releasing the most recent direction, check if the other is still held
+      if ((e.code === 'ArrowLeft' || e.code === 'KeyA') && (this.keys['ArrowRight'] || this.keys['KeyD'])) {
+        this.lastDirection = 'right';
+      } else if ((e.code === 'ArrowRight' || e.code === 'KeyD') && (this.keys['ArrowLeft'] || this.keys['KeyA'])) {
+        this.lastDirection = 'left';
+      }
     });
 
     // Mobile touch controls
@@ -68,23 +80,27 @@ export class InputManager {
       
       if (x < halfWidth) {
         this.touchState.left = true;
+        this.lastDirection = 'left';
       } else {
         this.touchState.right = true;
+        this.lastDirection = 'right';
       }
     });
 
     // Touch end
     document.addEventListener('touchend', (e) => {
       e.preventDefault();
-      this.touchState.left = false;
-      this.touchState.right = false;
+  this.touchState.left = false;
+  this.touchState.right = false;
+  this.lastDirection = null;
     });
 
     // Touch cancel (when touch is interrupted)
     document.addEventListener('touchcancel', (e) => {
       e.preventDefault();
-      this.touchState.left = false;
-      this.touchState.right = false;
+  this.touchState.left = false;
+  this.touchState.right = false;
+  this.lastDirection = null;
     });
 
     // Mouse events for testing on desktop (still use canvas for mouse)

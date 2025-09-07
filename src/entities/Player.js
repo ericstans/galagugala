@@ -599,14 +599,24 @@ export class Player {
     
     // Player movement (only if not destroyed)
     if (gameState.isPlaying && !gameState.playerDestroyed) {
-      if (inputManager.isLeftPressed()) {
-        this.mesh.position.x -= GAME_CONFIG.PLAYER_SPEED;
-        velocityX = -GAME_CONFIG.PLAYER_SPEED;
-        if (this.mesh.position.x < leftBound) this.mesh.position.x = leftBound;
+      // Enhanced logic: if both left and right are held, use the most recently pressed direction
+      let moveDirection = 0;
+      if (inputManager.isLeftPressed() && !inputManager.isRightPressed()) {
+        moveDirection = -1;
+      } else if (!inputManager.isLeftPressed() && inputManager.isRightPressed()) {
+        moveDirection = 1;
+      } else if (inputManager.isLeftPressed() && inputManager.isRightPressed()) {
+        // Both held: use most recently pressed
+        if (inputManager.lastDirection === 'left') {
+          moveDirection = -1;
+        } else if (inputManager.lastDirection === 'right') {
+          moveDirection = 1;
+        }
       }
-      if (inputManager.isRightPressed()) {
-        this.mesh.position.x += GAME_CONFIG.PLAYER_SPEED;
-        velocityX = GAME_CONFIG.PLAYER_SPEED;
+      if (moveDirection !== 0) {
+        this.mesh.position.x += moveDirection * GAME_CONFIG.PLAYER_SPEED;
+        velocityX = moveDirection * GAME_CONFIG.PLAYER_SPEED;
+        if (this.mesh.position.x < leftBound) this.mesh.position.x = leftBound;
         if (this.mesh.position.x > rightBound) this.mesh.position.x = rightBound;
       }
       if (inputManager.isShootPressed()) {
