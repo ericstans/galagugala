@@ -97,12 +97,19 @@ export class OverlayManager {
       scoreDisplay.style.pointerEvents = 'none'; // Don't interfere with game interaction
       scoreDisplay.style.userSelect = 'none';
       scoreDisplay.style.display = 'none'; // Initially hidden
-      // Initialize with dimmed zeros
-      let html = '';
+      // Pre-create digit spans for incremental updates
+      this.scoreDigitSpans = [];
       for (let i = 0; i < 10; i++) {
-        html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+        const span = document.createElement('span');
+        span.textContent = '0';
+        span.style.color = '#004444';
+        span.style.textShadow = '0 0 5px #004444';
+  // Mark as dimmed so first real score update can brighten non-leading digits
+  span._dimmed = true;
+        this.scoreDigitSpans.push(span);
+        scoreDisplay.appendChild(span);
       }
-      scoreDisplay.innerHTML = html;
+      this._lastScoreString = '0000000000';
       document.body.appendChild(scoreDisplay);
     }
     return scoreDisplay;
@@ -299,27 +306,48 @@ export class OverlayManager {
       }
       
       // Show "MAX" instead of 10
-  // Show number centered, 'chain' to the right
-  const chainNumber = chainCount === 10 ? 'MAX' : chainCount;
-  this.chainDisplay.innerHTML = `
-    <span style="position:relative; display:inline-block; min-width:4.5em; text-align:center;">
-      <span id='chain-number' style="display:inline-block;">${chainNumber}</span>
-      <span id='chain-label' style="position:absolute; left:60%; top:50%; transform:translateY(-50%) translateX(0.5em); font-size:3rem; vertical-align:middle; white-space:nowrap;">chain</span>
-    </span>
-  `;
-  this.chainDisplay.style.display = 'block';
-  this.chainDisplay.style.opacity = '1';
+      const chainNumber = chainCount === 10 ? 'MAX' : chainCount;
+      // If we're coming from a broken state or uninitialized, build structure once
+      if (this.chainDisplay.dataset.mode !== 'chain') {
+        this.chainDisplay.textContent = '';
+        const wrapper = document.createElement('span');
+        wrapper.style.position = 'relative';
+        wrapper.style.display = 'inline-block';
+        wrapper.style.minWidth = '4.5em';
+        wrapper.style.textAlign = 'center';
+        const numberSpan = document.createElement('span');
+        numberSpan.id = 'chain-number';
+        numberSpan.style.display = 'inline-block';
+        const labelSpan = document.createElement('span');
+        labelSpan.id = 'chain-label';
+        labelSpan.textContent = 'chain';
+        labelSpan.style.position = 'absolute';
+        labelSpan.style.left = '60%';
+        labelSpan.style.top = '50%';
+        labelSpan.style.transform = 'translateY(-50%) translateX(0.5em)';
+        labelSpan.style.fontSize = '3rem';
+        labelSpan.style.verticalAlign = 'middle';
+        labelSpan.style.whiteSpace = 'nowrap';
+        wrapper.appendChild(numberSpan);
+        wrapper.appendChild(labelSpan);
+        this.chainDisplay.appendChild(wrapper);
+        this.chainNumberSpan = numberSpan;
+        this.chainDisplay.dataset.mode = 'chain';
+      }
+      // Update only the number text if changed
+      if (this.chainNumberSpan && this.chainNumberSpan.textContent !== String(chainNumber)) {
+        this.chainNumberSpan.textContent = chainNumber;
+      }
+      this.chainDisplay.style.display = 'block';
+      this.chainDisplay.style.opacity = '1';
       // Don't set opacity explicitly - let CSS handle it
       
       // Start fade-out after 3 seconds
-      console.log(`Setting fade-out timer for chain ${chainCount}`);
       this.chainFadeTimeout = setTimeout(() => {
-        console.log(`Fade-out timer triggered for chain ${chainCount}`);
         this.chainDisplay.style.opacity = '0';
         
         // Hide the element after the fade animation completes
         setTimeout(() => {
-          console.log(`Hiding chain display for chain ${chainCount}`);
           this.chainDisplay.style.display = 'none';
           this.chainFadeTimeout = null;
         }, 500); // Match the transition duration
@@ -337,7 +365,8 @@ export class OverlayManager {
     this.chainBrokenAnimating = true;
     
     // Show "CHAIN BROKEN" text instead of fading out the number
-    this.chainDisplay.textContent = 'CHAIN\nBROKEN';
+  this.chainDisplay.textContent = 'CHAIN\nBROKEN';
+  this.chainDisplay.dataset.mode = 'broken';
     this.chainDisplay.style.display = 'block';
     this.chainDisplay.style.opacity = '1'; // Start fully visible
     
@@ -362,11 +391,9 @@ export class OverlayManager {
     
     // Only update if chain count has changed
     if (chainCount !== this.lastChainCount) {
-      console.log(`Chain count changed from ${this.lastChainCount} to ${chainCount}`);
       if (chainCount > 2) {
         // Only show new chain if "CHAIN BROKEN" animation is not in progress
         if (!this.chainBrokenAnimating) {
-          console.log(`Showing chain ${chainCount}`);
           this.showChain(chainCount);
         }
       } else {
@@ -469,32 +496,39 @@ export class OverlayManager {
 
   updateScore(score) {
     const scoreStr = score.toString();
-    const paddedScore = scoreStr.padStart(10, '0');
-    
-    // Create HTML with dimmed leading zeros and bright score digits
-    let html = '';
-    const leadingZeros = paddedScore.length - scoreStr.length;
-    
-    // Add dimmed leading zeros
-    for (let i = 0; i < leadingZeros; i++) {
-      html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+    const padded = scoreStr.padStart(10, '0');
+    if (!this.scoreDigitSpans) return; // Safety
+    // Determine index where significant digits start
+    const leadingZeros = 10 - scoreStr.length;
+    for (let i = 0; i < 10; i++) {
+      const span = this.scoreDigitSpans[i];
+      const ch = padded[i];
+      if (span.textContent !== ch) span.textContent = ch;
+      const shouldDim = i < leadingZeros;
+      const currentlyDim = span._dimmed === true;
+      if (shouldDim !== currentlyDim) {
+        if (shouldDim) {
+          span.style.color = '#004444';
+          span.style.textShadow = '0 0 5px #004444';
+          span._dimmed = true;
+        } else {
+          span.style.color = '#00fffc';
+          span.style.textShadow = '0 0 10px #00fffc, 0 0 20px #00fffc';
+          span._dimmed = false;
+        }
+      }
     }
-    
-    // Add bright score digits
-    for (let i = 0; i < scoreStr.length; i++) {
-      html += '<span style="color: #00fffc; text-shadow: 0 0 10px #00fffc, 0 0 20px #00fffc;">' + scoreStr[i] + '</span>';
-    }
-    
-    this.scoreDisplay.innerHTML = html;
   }
 
   resetScore() {
-    // Show all zeros in dimmed color
-    let html = '';
+    if (!this.scoreDigitSpans) return;
     for (let i = 0; i < 10; i++) {
-      html += '<span style="color: #004444; text-shadow: 0 0 5px #004444;">0</span>';
+      const span = this.scoreDigitSpans[i];
+      span.textContent = '0';
+      span.style.color = '#004444';
+      span.style.textShadow = '0 0 5px #004444';
+      span._dimmed = true;
     }
-    this.scoreDisplay.innerHTML = html;
   }
 
   // Score popup methods

@@ -7,6 +7,7 @@ import { PowerUpManager } from './entities/PowerUpManager.js';
 import { EffectsManager } from './effects/EffectsManager.js';
 import { InputManager } from './input/InputManager.js';
 import { OverlayManager } from './ui/OverlayManager.js';
+import { PerformancePanel } from './ui/PerformancePanel.js';
 import { CollisionManager } from './physics/CollisionManager.js';
 import { GAME_CONFIG } from './config/GameConstants.js';
 
@@ -18,6 +19,10 @@ class Game {
     this.audio = new AudioManager();
     this.input = new InputManager();
     this.overlay = new OverlayManager();
+  this.perfPanel = null; // Performance panel (lazy init)
+  // Enable performance panel only if URL param perf=1
+  const perfParam = new URLSearchParams(window.location.search).get('perf');
+  this.enablePerfPanel = perfParam === '1';
     
     this.player = new Player(this.engine.scene);
     
@@ -222,6 +227,10 @@ class Game {
         
         // Start game loop
         this.engine.animate(() => this.update());
+        // Init performance panel only if enabled via URL param
+        if (this.enablePerfPanel) {
+          this.perfPanel = new PerformancePanel(this.engine.renderer);
+        }
         
         // Start soundtrack for current level
         this.audio.updateSoundtrack(this.currentLevel);
@@ -268,7 +277,9 @@ class Game {
   }
   
   update() {
-    // Only update if game has started
+  // Perf panel update runs every frame (even if waiting to start, to show idle FPS)
+  if (this.perfPanel) this.perfPanel.update();
+  // Only update if game has started
     if (!this.gameStarted) return;
     
     const gameState = this.engine.getGameState();
