@@ -33,6 +33,11 @@ export class EnemyManager {
     this.audioManager = audioManager; // Reference to audio manager for sound effects
     
     this.createEnemies(level, gameEngine);
+
+  // Reusable temp vectors to reduce GC churn in update loops
+  this._tmpV1 = new THREE.Vector3();
+  this._tmpV2 = new THREE.Vector3();
+  this._tmpV3 = new THREE.Vector3();
   }
 
   createEnemies(level = 1, gameEngine = null) {
@@ -106,7 +111,8 @@ export class EnemyManager {
     
     for (let row = 0; row < totalRows; row++) {
       for (let col = 0; col < totalCols; col++) {
-  const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial);
+  // Clone base material so color changes (warnings) are per-enemy not global
+  const enemy = new THREE.Mesh(scaledGeometry, this.enemyMaterial.clone());
   // Single edges overlay (dramatically fewer draw calls)
   const edgeGeometry = new THREE.EdgesGeometry(scaledGeometry);
   const edges = new THREE.LineSegments(edgeGeometry, this.enemyEdgeMaterial);
@@ -346,20 +352,22 @@ export class EnemyManager {
         enemy.position.x = enemy.userData.formationX + Math.sin(Date.now() * 0.001 + enemy.userData.formationY) * 0.1;
         enemy.position.y = enemy.userData.formationY + Math.cos(Date.now() * 0.001 + enemy.userData.formationX) * 0.05;
       } else if (enemy.userData.state === 'diving') {
-        // Move along quadratic Bezier curve
+        // Move along quadratic Bezier curve (allocation-free)
         enemy.userData.diveTime++;
         const t = enemy.userData.diveTime / enemy.userData.diveDuration;
         const [p0, p1, p2] = enemy.userData.diveCurve;
         if (t < 1) {
-          // Quadratic Bezier interpolation
-          const a = p0.clone().lerp(p1, t);
-          const b = p1.clone().lerp(p2, t);
-          enemy.position.copy(a.lerp(b, t));
+          const oneMinusT = 1 - t;
+          // B(t) = (1-t)^2 * p0 + 2(1-t)t * p1 + t^2 * p2
+            enemy.position.set(
+              oneMinusT * oneMinusT * p0.x + 2 * oneMinusT * t * p1.x + t * t * p2.x,
+              oneMinusT * oneMinusT * p0.y + 2 * oneMinusT * t * p1.y + t * t * p2.y,
+              oneMinusT * oneMinusT * p0.z + 2 * oneMinusT * t * p1.z + t * t * p2.z
+            );
         } else {
-          // Dive complete, start waiting off-screen at bottom
           enemy.userData.state = 'waiting';
           enemy.userData.waitTime = 0;
-          enemy.userData.waitDuration = 18 + Math.random() * 102; // 0.3-2 seconds (18-120 frames at 60fps)
+          enemy.userData.waitDuration = 18 + Math.random() * 102; // 0.3-2 seconds
         }
       } else if (enemy.userData.state === 'waiting') {
         // Wait off-screen at bottom before teleporting
@@ -387,26 +395,22 @@ export class EnemyManager {
           enemy.userData.returnSideOffset = (Math.random() - 0.5) * 2; // Small random offset
         }
       } else if (enemy.userData.state === 'returning') {
-        // Move back to formation from the side
         enemy.userData.returnTime++;
         const t = enemy.userData.returnTime / enemy.userData.returnDuration;
-        
         if (t < 1) {
-          // Create a curved path from the top to formation
           const start = enemy.userData.returnStart;
-          const end = new THREE.Vector3(enemy.userData.formationX, enemy.userData.formationY, 0);
-          
-          // Create a control point for the curve (slightly to the side for natural arc)
-          const mid = new THREE.Vector3(
-            enemy.userData.formationX + enemy.userData.returnSideOffset,
-            enemy.userData.formationY + 2, // Mid-point between top and formation
-            0
+          const endX = enemy.userData.formationX;
+          const endY = enemy.userData.formationY;
+          const endZ = 0;
+          const midX = enemy.userData.formationX + enemy.userData.returnSideOffset;
+          const midY = enemy.userData.formationY + 2;
+          const midZ = 0;
+          const oneMinusT = 1 - t;
+          enemy.position.set(
+            oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * midX + t * t * endX,
+            oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * midY + t * t * endY,
+            oneMinusT * oneMinusT * start.z + 2 * oneMinusT * t * midZ + t * t * endZ
           );
-          
-          // Quadratic Bezier interpolation for smooth curve
-          const a = start.clone().lerp(mid, t);
-          const b = mid.clone().lerp(end, t);
-          enemy.position.copy(a.lerp(b, t));
         } else {
           enemy.userData.state = 'formation';
           enemy.position.set(enemy.userData.formationX, enemy.userData.formationY, 0);
