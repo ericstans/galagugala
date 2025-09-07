@@ -547,6 +547,7 @@ class Game {
         if (this.player.hasActiveShield()) {
           // Shield absorbs the hit
           this.player.deactivateShield();
+          this.audio.createRobotSpeech("Shield Destroyed");
           
           // Remove the bullet that hit and clean up its trail
           const hitBullet = enemyBulletCollision.bullet;
