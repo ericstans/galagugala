@@ -30,6 +30,7 @@ export class EnemyManager {
   }
 
   createEnemies(level = 1, gameEngine = null) {
+    this.currentLevel = level;
     this.enemies = [];
     
     // Calculate level-based enemy formation size
