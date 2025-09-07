@@ -299,8 +299,16 @@ export class OverlayManager {
       }
       
       // Show "MAX" instead of 10
-      this.chainDisplay.textContent = chainCount === 10 ? 'MAX' : chainCount;
-      this.chainDisplay.style.display = 'block';
+  // Show number centered, 'chain' to the right
+  const chainNumber = chainCount === 10 ? 'MAX' : chainCount;
+  this.chainDisplay.innerHTML = `
+    <span style="position:relative; display:inline-block; min-width:4.5em; text-align:center;">
+      <span id='chain-number' style="display:inline-block;">${chainNumber}</span>
+      <span id='chain-label' style="position:absolute; left:60%; top:50%; transform:translateY(-50%) translateX(0.5em); font-size:3rem; vertical-align:middle; white-space:nowrap;">chain</span>
+    </span>
+  `;
+  this.chainDisplay.style.display = 'block';
+  this.chainDisplay.style.opacity = '1';
       // Don't set opacity explicitly - let CSS handle it
       
       // Start fade-out after 3 seconds
