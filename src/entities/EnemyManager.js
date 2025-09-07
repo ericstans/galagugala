@@ -215,7 +215,7 @@ export class EnemyManager {
     }
 
     // Enemy bullet system (level 5+)
-    if (this.currentLevel >= 5 && !divingDisabled) {
+    if (this.currentLevel >= GAME_CONFIG.ENEMY_BULLET_START_LEVEL && !divingDisabled) {
       if (this.bulletCooldown > 0) this.bulletCooldown--;
       else if (this.enemies.length > 0 && gameState.isPlaying && !gameState.playerDestroyed) {
         // Different bullet types based on level
