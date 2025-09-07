@@ -38,6 +38,12 @@ export class EnemyManager {
   this._tmpV1 = new THREE.Vector3();
   this._tmpV2 = new THREE.Vector3();
   this._tmpV3 = new THREE.Vector3();
+
+  // Bullet & trail pools
+  this._bulletPool = [];
+  this._maxPooledBullets = 100; // safety cap
+  this._trailParticlePool = [];
+  this._maxTrailParticles = 300; // pairs count toward this roughly
   }
 
   createEnemies(level = 1, gameEngine = null) {
@@ -130,7 +136,7 @@ export class EnemyManager {
           diveDuration: GAME_CONFIG.ENEMY_DIVE_DURATION_MIN + Math.random() * (GAME_CONFIG.ENEMY_DIVE_DURATION_MAX - GAME_CONFIG.ENEMY_DIVE_DURATION_MIN), // frames
           diveAngle: 0,
           diveRadius: 0,
-          diveCenter: new THREE.Vector3(),
+          diveCenter: new THREE.Vector3(), 
         };
         this.scene.add(enemy);
         this.enemies.push(enemy);
@@ -616,7 +622,7 @@ export class EnemyManager {
       if (bullet.userData.isGreen) {
         this.cleanupBulletTrail(bullet);
       }
-      this.scene.remove(bullet);
+  this.recycleBullet(bullet);
     });
     this.enemyBullets = [];
   }
@@ -646,73 +652,48 @@ export class EnemyManager {
       bulletSpeed = GAME_CONFIG.ENEMY_BULLET_GREEN_SPEED;
       spreadAmount = GAME_CONFIG.ENEMY_BULLET_GREEN_SPREAD;
     }
-    
-    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-    
-    // Position bullet at enemy location
-    bullet.position.copy(enemy.position);
-    bullet.position.y -= 0.5; // Slightly below enemy
-    
-    // Calculate direction to player with random spread
-    const direction = new THREE.Vector3();
-    direction.subVectors(player.position, enemy.position);
-    direction.normalize();
-    
-    // Add random spread based on bullet type
-    const spreadAngle = (Math.random() - 0.5) * spreadAmount;
-    const spreadAxis = new THREE.Vector3(0, 0, 1); // Rotate around Z axis
-    direction.applyAxisAngle(spreadAxis, spreadAngle);
-    
+    // Handle yellow bullets BEFORE creating pooled bullet to avoid orphan pooled instance
     if (bulletType === 'yellow') {
-      // Yellow bullets: Create variable number of bullets in a spread pattern, all going straight down
       let bulletCount = GAME_CONFIG.ENEMY_BULLET_YELLOW_COUNT; // Default 5
-      
-      // Variable bullet counts based on level
       if (this.currentLevel >= GAME_CONFIG.ENEMY_BULLET_YELLOW_MULTIPLE_COUNT_START_LEVEL) {
-        // Level 40+: 3 equal possibilities (5, 7, 9)
         const countOptions = [5, 7, 9];
         bulletCount = countOptions[Math.floor(Math.random() * countOptions.length)];
       } else if (this.currentLevel >= GAME_CONFIG.ENEMY_BULLET_YELLOW_VARIABLE_COUNT_START_LEVEL) {
-        // Level 20+: 50% chance for 7 bullets, 50% chance for 5 bullets
         bulletCount = Math.random() < 0.5 ? 7 : 5;
       }
-      
       const maxSpread = GAME_CONFIG.ENEMY_BULLET_YELLOW_SPREAD;
-      
       for (let i = 0; i < bulletCount; i++) {
-        const yellowBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone());
-        
-        // Position bullet at enemy location
+        const yellowBullet = new THREE.Mesh(bulletGeometry, bulletMaterial.clone()); // Not pooled
         yellowBullet.position.copy(enemy.position);
-        yellowBullet.position.y -= 0.5; // Slightly below enemy
-        
-        // Calculate spread angle for this bullet
-        const spreadRatio = (i - (bulletCount - 1) / 2) / ((bulletCount - 1) / 2); // -1 to 1
+        yellowBullet.position.y -= 0.5;
+        const spreadRatio = (i - (bulletCount - 1) / 2) / ((bulletCount - 1) / 2); // -1..1
         const spreadAngle = spreadRatio * maxSpread;
-        
-        // Direction is straight down with horizontal spread
-        const direction = new THREE.Vector3(Math.sin(spreadAngle), -1, 0);
-        direction.normalize();
-        
-        // Set bullet properties
+        const dir = new THREE.Vector3(Math.sin(spreadAngle), -1, 0).normalize();
         yellowBullet.userData = {
-          velocity: direction.clone().multiplyScalar(bulletSpeed),
+          velocity: dir.clone().multiplyScalar(bulletSpeed),
           lifetime: 0,
           isGreen: false,
-          trailParticles: []
+          trailParticles: [],
+          allowPooling: false
         };
-        
-        // Add bullet to scene and array
         this.scene.add(yellowBullet);
         this.enemyBullets.push(yellowBullet);
       }
-      
-      // Play yellow bullet sound effect
-      if (this.audioManager) {
-        this.audioManager.playYellowBulletFire();
-      }
-      return; // Exit early for yellow bullets
+      if (this.audioManager) this.audioManager.playYellowBulletFire();
+      return; // Done with yellow bullets
     }
+
+    // Create pooled bullet for green/red only
+    const bullet = this.getBullet(bulletGeometry, bulletMaterial);
+    // Position bullet at enemy location
+    bullet.position.copy(enemy.position);
+    bullet.position.y -= 0.5;
+    // Calculate direction to player with random spread
+    const direction = new THREE.Vector3();
+    direction.subVectors(player.position, enemy.position).normalize();
+    const spreadAngle = (Math.random() - 0.5) * spreadAmount;
+    const spreadAxis = new THREE.Vector3(0, 0, 1);
+    direction.applyAxisAngle(spreadAxis, spreadAngle);
     
     // Single bullet for green and red types
     // Add some vertical spread as well (less for green bullets)
@@ -745,7 +726,8 @@ export class EnemyManager {
       velocity: direction.multiplyScalar(bulletSpeed),
       lifetime: 0,
       isGreen: bulletType === 'green',
-      trailParticles: []
+      trailParticles: [],
+      allowPooling: true
     };
     
     // Create trail for green bullets
@@ -762,7 +744,7 @@ export class EnemyManager {
       }
     }
     
-    this.scene.add(bullet);
+  if (!bullet.parent) this.scene.add(bullet);
     this.enemyBullets.push(bullet);
   }
 
@@ -787,7 +769,7 @@ export class EnemyManager {
         if (bullet.userData.isGreen) {
           this.cleanupBulletTrail(bullet);
         }
-        this.scene.remove(bullet);
+        this.recycleBullet(bullet);
         this.enemyBullets.splice(i, 1);
       }
     }
@@ -800,22 +782,8 @@ export class EnemyManager {
     
     for (let i = 0; i < trailLength; i++) {
       // Create first trail particle
-      const trailGeometry1 = new THREE.SphereGeometry(GAME_CONFIG.GREEN_BULLET_TRAIL_PARTICLE_SIZE, 6, 4);
-      const trailMaterial1 = new THREE.MeshBasicMaterial({ 
-        color: 0x66ff66,
-        transparent: true,
-        opacity: 0.7 - (i * 0.08) // Fade out along trail
-      });
-      const trailParticle1 = new THREE.Mesh(trailGeometry1, trailMaterial1);
-      
-      // Create second trail particle (180deg out of phase)
-      const trailGeometry2 = new THREE.SphereGeometry(GAME_CONFIG.GREEN_BULLET_TRAIL_PARTICLE_SIZE, 6, 4);
-      const trailMaterial2 = new THREE.MeshBasicMaterial({ 
-        color: 0x66ff66,
-        transparent: true,
-        opacity: 0.7 - (i * 0.08) // Fade out along trail
-      });
-      const trailParticle2 = new THREE.Mesh(trailGeometry2, trailMaterial2);
+  const trailParticle1 = this.getTrailParticle(0.7 - (i * 0.08));
+  const trailParticle2 = this.getTrailParticle(0.7 - (i * 0.08));
       
       // Calculate bullet direction for positioning and rotation
       const bulletDirection = bullet.userData.velocity.clone().normalize();
@@ -936,9 +904,73 @@ export class EnemyManager {
 
   cleanupBulletTrail(bullet) {
     bullet.userData.trailParticles.forEach(particle => {
-      this.scene.remove(particle);
+      this.recycleTrailParticle(particle);
     });
     bullet.userData.trailParticles = [];
+  }
+
+  // Bullet pooling helpers
+  getBullet(geometry, material) {
+    // Only pool simple single bullets (geometries of same type/size reused via cloning)
+    if (this._bulletPool.length) {
+      const b = this._bulletPool.pop();
+      // Replace geometry & material if different type; simplest approach: recreate if mismatch
+      if (b.geometry.type !== geometry.type) {
+        b.geometry.dispose();
+        b.geometry = geometry.clone();
+      }
+      if (b.material.color.getHex() !== material.color.getHex()) {
+        b.material.dispose();
+        b.material = material.clone();
+      }
+      b.visible = true;
+      return b;
+    }
+    return new THREE.Mesh(geometry, material);
+  }
+
+  recycleBullet(bullet) {
+    // Skip pooling if bullet explicitly disallows it (e.g., yellow spread bullets)
+    if (bullet.userData && bullet.userData.allowPooling === false) {
+      if (bullet.parent) this.scene.remove(bullet);
+      bullet.geometry.dispose();
+      bullet.material.dispose();
+      return;
+    }
+    if (this._bulletPool.length < this._maxPooledBullets) {
+      bullet.visible = false;
+      // Keep in scene to avoid add/remove overhead; position off-screen
+      bullet.position.set(0, -100, 0);
+      this._bulletPool.push(bullet);
+    } else {
+      if (bullet.parent) this.scene.remove(bullet);
+      bullet.geometry.dispose();
+      bullet.material.dispose();
+    }
+  }
+
+  getTrailParticle(opacity) {
+    if (this._trailParticlePool.length) {
+      const p = this._trailParticlePool.pop();
+      p.material.opacity = opacity;
+      p.visible = true;
+      return p;
+    }
+    const geo = new THREE.SphereGeometry(GAME_CONFIG.GREEN_BULLET_TRAIL_PARTICLE_SIZE, 6, 4);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  recycleTrailParticle(particle) {
+    if (this._trailParticlePool.length < this._maxTrailParticles) {
+      particle.visible = false;
+      particle.position.set(0, -100, 0);
+      this._trailParticlePool.push(particle);
+    } else {
+      if (particle.parent) this.scene.remove(particle);
+      particle.geometry.dispose();
+      particle.material.dispose();
+    }
   }
 
   isEnemyInBackHalf(enemy) {
